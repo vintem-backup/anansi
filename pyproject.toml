@@ -1,0 +1,36 @@
+[tool.poetry]
+name = "anansi"
+version = "0.1.0"
+description = "A tool to analyze data and perform operations in markets"
+authors = ["Marcus Mello Vintem <marcus@vintem.tech>"]
+
+license = "GPL-3.0-or-later"
+readme = "README.md"
+homepage = "https://github.com/marcusmello/anansi.git"
+repository = "https://gitlab.com/marcusmello/anansi.git"
+keywords = ["candlesticks", 
+            "cryptocurrency", 
+            "stock market",
+            "trading bot",
+            "finance"]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+requests = "^2.24.0"
+pendulum = "^2.1.0"
+requests_mock = "^1.8.0"
+pandas = "^1.0.5"
+pony = "^0.7.13"
+
+[tool.poetry.dev-dependencies]
+pytest = "^5.2"
+ipykernel = "^5.3.4"
+jupyter = "^1.0.0"
+
+[tool.dephell.main]
+from = {format = "poetry", path = "pyproject.toml"}
+to = {format = "pipfile", path = "Pipfile"}
+
+[build-system]
+requires = ["poetry>=0.12"]
+build-backend = "poetry.masonry.api"
