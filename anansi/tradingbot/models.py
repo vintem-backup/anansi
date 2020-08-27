@@ -20,6 +20,10 @@ class Customer(db.Entity, CustomerMixin):
     last_name = Optional(str)
     email = Optional(str, unique=True)
 
+    @db_session
+    def alter_name_to(self, new_name):
+        self.user_name = new_name
+
 
 class Position(db.Entity, PositionMixin):
     trader = Optional("Trader")
@@ -45,10 +49,3 @@ class Trader(db.Entity, TraderMixin):
 
 
 db.generate_mapping(create_tables=True)
-
-# @db_session
-# def add_user(user_)
-
-
-def populate_db():
-    pass
