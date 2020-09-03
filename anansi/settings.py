@@ -1,4 +1,5 @@
 ENVIRONMENT = "DEV"
+AUTO_START = False
 
 CrossSMA, StopTrailing3T = "CrossSMA", "StopTrailing3T"
 
