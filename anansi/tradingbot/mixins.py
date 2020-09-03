@@ -37,7 +37,7 @@ class TraderMixin:
         self.Analyzer.proceed_analysis()
 
     def classifier_analysis(self):
-        self._analysis_pipeline(Classifier)
+        self._analysis_pipeline(self.Classifier)
 
     def stop_analysis(self):
         self._analysis_pipeline(self.StopLoss)
