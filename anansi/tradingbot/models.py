@@ -7,18 +7,17 @@ from ..share import tools
 db = Database()
 
 if ENVIRONMENT == "DEV":
-    _path = "{}/anansi.db".format(str(os.getcwd()))
-    db = Database()
-    db.bind('sqlite', _path, create_db=True)
+    _db_path = "{}/anansi.db".format(str(os.getcwd()))
+    db.bind('sqlite', _db_path, create_db=True)
     sql_debug(True)
 
 
 class Customer(db.Entity, CustomerMixin):
     user_name = Required(str, unique=True)
     traders = Set("Trader")
-    first_name = Optional(str)
-    last_name = Optional(str)
-    email = Optional(str, unique=True)
+    first_name = Required(str, default=None)
+    last_name = Required(str, default=None)
+    email = Required(str, unique=True, default=None)
 
     @db_session
     def alter_name_to(self, new_name):
@@ -26,10 +25,12 @@ class Customer(db.Entity, CustomerMixin):
 
 
 class Position(db.Entity, PositionMixin):
+    # TODO: Sobrecarregar menos este objeto, criando o objeto "Events"
+    # para o trader
     trader = Optional("Trader")
     side = Optional(str)
-    start_at_time = Optional(int)
-    start_at_price = Optional(float)
+    start_time = Optional(int)
+    start_price = Optional(float)
     stop_reference_price = Optional(float)
     amount_quote = Optional(float)
     amount_base = Optional(float)
@@ -37,7 +38,7 @@ class Position(db.Entity, PositionMixin):
 
 class Trader(db.Entity, TraderMixin):
     status = Required(str, default=Default.status)
-    costumer = Required("Customer", columns=["name"])
+    costumer = Required("Customer", columns=["user_name"])
     mode = Required(str, default=Default.mode)
     position = Required("Position")
     exchange = Required(str)
