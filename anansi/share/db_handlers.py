@@ -128,3 +128,19 @@ class SQLite3:
             clause, str(number_of_entries))
 
         return self._proceed_search(query)
+
+
+class StorageKlines(SQLite3):
+    _attributes = (
+        "Open_time INTEGER primary key",
+        "Open REAL, High REAL",
+        "Low REAL",
+        "Close REAL",
+        "Volume REAL",
+    )
+
+    def __init__(self, table_name: str):
+        self.attributes = "({})".format(", ".join(self._attributes))
+        super(StorageKlines, self).__init__(
+            db_name="klines.db", table_name=table_name, primary_key="Open_time"
+        )
