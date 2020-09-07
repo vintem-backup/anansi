@@ -19,7 +19,7 @@ class Default:
     stop_loss = StopTrailing3T
 
 
-klines_desired_info = [
+kline_desired_informations = [
     "Open_time",
     "Open",
     "High",
@@ -43,7 +43,7 @@ class Binance_:
     records_per_request = 500  # Default: 500 | Limit: 1000 samples/response
     minimal_time_frame = "1m"
 
-    kline_information_map = [
+    kline_informations = [
         # Que informações (em ordem) são retornadas pela Binance em cada candle
         "Open_time",
         "Open",
