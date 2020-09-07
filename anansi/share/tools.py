@@ -3,6 +3,21 @@
 
 from functools import wraps, partial
 from time import time
+import pendulum
+
+
+class ParseDateTime:
+    fmt = "YYYY-MM-DD HH:mm:ss"
+
+    def __init__(self, date_time_in):
+        self.date_time_in = date_time_in
+
+    def from_human_readable_to_timestamp(self):
+        return pendulum.from_format(
+            self.date_time_in, self.fmt, "UTC").int_timestamp
+
+    def from_timestamp_to_human_readable(self):
+        return pendulum.from_timestamp(self.date_time_in).to_datetime_string()
 
 
 class ConvertTimeFrame:
@@ -86,6 +101,6 @@ class DocInherit(object):
 
     def use_parent_doc(self, func, source):
         if source is None:
-            raise NameError("Can't find '%s' in parents" % self.name)
+            raise NameError("Can't find {} in parents".format(self.name))
         func.__doc__ = source.__doc__
         return func
