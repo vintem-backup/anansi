@@ -1,7 +1,6 @@
 from .. import settings
 from ..share.tools import (
-    DocInherit as doc_inherit,
-    ConvertTimeFrame as ParseTime)
+    DocInherit as doc_inherit, ConvertTimeFrame)
 import pandas as pd
 import requests
 import pendulum
@@ -87,7 +86,8 @@ class KlinesPreFormat:
         ).astype({"Open_time": "int32", "Close_time": "int32"})
 
         klines.attrs.update(
-            {"SecondsTimeFrame": ParseTime(self.time_frame).to_seconds()})
+            {"SecondsTimeFrame": ConvertTimeFrame(
+                self.time_frame).to_seconds()})
         return klines
 
 
@@ -147,15 +147,6 @@ class DataBroker:
             kline_information_map, também nas configurações.
         """
 
-        raise NotImplementedError
-
-    def _oldest_open_time(self, symbol: str, time_frame: str) -> int:
-        """ Timestamp do Open_time do primeiro candle deste tipo
-        (symbol e time_frame) armazenado no servidor da corretora
-
-        Returns:
-            int: Timestamp em segundos
-        """
         raise NotImplementedError
 
 
@@ -218,9 +209,3 @@ class BinanceDataWrapper(DataBroker, settings.Binance_):
         if show_only_desired_info:
             return klines[settings.kline_desired_informations]
         return klines
-
-    @doc_inherit
-    def _oldest_open_time(self, symbol: str, time_frame: str) -> int:
-        return self.klines(
-            symbol=symbol, time_frame=time_frame, since=1, number_of_candles=1
-        ).Open_time.item()
