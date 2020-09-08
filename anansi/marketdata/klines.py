@@ -1,9 +1,10 @@
 import time
 import pandas as pd
 import pendulum
-from . import data_brokers, indicators
+from . import (data_brokers as brokers,
+               indicators)
 from .. import settings
-from ..share.tools import ParseDateTime
+from ..share.tools import ParseDateTime, ConvertTimeFrame
 from ..share.db_handlers import StorageKlines
 
 
@@ -68,6 +69,7 @@ class FromBroker:
         "_broker",
         "symbol",
         "_time_frame",
+        "_ForceTimestampFormat",
         "_since",
         "_until",
     ]
@@ -78,6 +80,7 @@ class FromBroker:
             brokers, brokers.wrapper_for(self.broker_name))()
         self.symbol = symbol.upper()
         self._time_frame = time_frame
+        self._ForceTimestampFormat = False
         self._since = 1
         self._until = 2
 
@@ -92,21 +95,26 @@ class FromBroker:
     def _now(self) -> int:
         return (pendulum.now(tz="UTC")).int_timestamp
 
+    def SecondsTimeFrame(self):
+        return ConvertTimeFrame(self._time_frame).to_seconds()
+
     def _oldest_open_time(self) -> int:
-        return self._broker._oldest_open_time(
-            symbol=self.symbol, time_frame=self._time_frame)
+        return (
+            self._broker.klines(
+                symbol=self.symbol,
+                time_frame=self._time_frame,
+                since=1,
+                number_of_candles=1).Open_time.item())
 
     def _request_step(self) -> int:
-        return (self._broker.records_per_request *
-                settings.TimeFrames().seconds_in(  # ! A função de conversão aqui, mudou
-                    self._time_frame))
+        return self._broker.records_per_request * self.SecondsTimeFrame()
 
     def _get_raw_(self, appending_raw_to_db=False) -> pd.DataFrame:
 
-        _table_name = "{}_{}_{}_raw".format(
-            self.broker_name, self.symbol.lower(), self.time_frame)
+        table_name = "{}_{}_{}_raw".format(
+            self.broker_name, self.symbol.lower(), self._time_frame)
 
-        _Storage, klines = Storage(_table_name), pd.DataFrame()
+        Storage, klines = StorageKlines(table_name), pd.DataFrame()
 
         for timestamp in range(self._since,
                                self._until + 1,
@@ -117,7 +125,7 @@ class FromBroker:
                         self.symbol, self._time_frame, since=timestamp)
 
                     if appending_raw_to_db:
-                        _Storage.append_dataframe(raw_klines)
+                        Storage.append_dataframe(raw_klines)
                     klines = klines.append(raw_klines, ignore_index=True)
                     break
 
@@ -133,48 +141,52 @@ class FromBroker:
 
         return klines
 
-    def _get(self, **kwargs) -> pd.DataFrame:
+    def _get(self) -> pd.DataFrame:
         _klines = self._get_raw_()
-
-        TimeFmt = kwargs.get("TimeFmt")
-
-        if TimeFmt == "timestamp":
+        if self._ForceTimestampFormat:
             return _klines
 
         _klines.ParseTime.from_timestamp_to_human_readable()
         return _klines
 
-    def period(self, since: str, until: str, **kwargs) -> pd.DataFrame:
+    def _until_given(self, since, number_of_candles):
+        until = (number_of_candles + 1) * self.SecondsTimeFrame() + since
+        self._until = (until if until <= self._now() else self._now())
+
+    def _since_given(self, until, number_of_candles):
+        since = until - (number_of_candles + 1) * self.SecondsTimeFrame()
+        self._since = (since if since >= self._oldest_open_time()
+                       else self._oldest_open_time())
+
+    def _get_n_until(self, number_of_candles: int, until: int):
+        self._until = until
+        self._since_given(self._until, number_of_candles)
+        return self._get()[-number_of_candles:]
+
+    def _get_n_since(self, number_of_candles: int, since: int):
+        self._since = since
+        self._until_given(self._since, number_of_candles)
+        return self._get()[:number_of_candles]
+
+    def _get_given_since_and_until(self, since: str, until: str) -> pd.DataFrame:
         self._since = ParseDateTime(since).from_human_readable_to_timestamp()
         self._until = ParseDateTime(until).from_human_readable_to_timestamp()
 
-        return self._get(**kwargs)[:-1]
-
-    def oldest(self, number_of_candles=1, **kwargs) -> pd.DataFrame:
-        self._since = self._oldest_open_time()
-
-        _until = (number_of_candles + 1) * (
-            settings.TimeFrames().seconds_in(self._time_frame)
-        ) + self._since
-
-        self._until = (_until if _until <= self._now() else self._now())
-
-        return self._get(**kwargs)[:number_of_candles]
-
-    def newest(self, number_of_candles=1, **kwargs) -> pd.DataFrame:
-        self._until = self._now()
-
-        _since = self._until - (number_of_candles + 1) * (
-            settings.TimeFrames().seconds_in(self._time_frame))
-
-        self._since = (_since if _since >= self._oldest_open_time()
-                       else self._oldest_open_time())
-
-        return self._get(**kwargs)[-number_of_candles:]
+        return self._get()[:-1]
 
     def _raw_back_testing(self):
         self._since = self._oldest_open_time()
-        self._until = pendulum.now(tz="UTC").int_timestamp
+        self._until = self._now()
 
         # self._Storage.drop_table()
         self._get_raw_(appending_raw_to_db=True)
+
+    def get(self):
+        pass
+
+    def oldest(self, number_of_candles=1) -> pd.DataFrame:
+        return self._get_n_since(
+            number_of_candles, since=self._oldest_open_time())
+
+    def newest(self, number_of_candles=1) -> pd.DataFrame:
+        return self._get_n_until(number_of_candles, until=self._now())
