@@ -1,22 +1,53 @@
 ENVIRONMENT = "DEV"
 AUTO_START = False
 
-CrossSMA, StopTrailing3T = "CrossSMA", "StopTrailing3T"
 
-# The possible traders statuses
-Running, NotRunning = "Running", "NotRunning"
+class ImplementedTraders:
+    DefaultTrader = "DefaultTrader"
 
-# The possible modes
-BackTesting, RealTrading, RealTimeTest = (
-    "BackTesting", "RealTrading", "RealTimeTest"
-)
+
+class ImplementedClassifiers:
+    CrossSMA = "CrossSMA"
+
+
+class ImplementedStopLosses:
+    StopTrailing3T = "StopTrailing3T"
+
+
+class PossibleStatuses:
+    Running = "Running"
+    NotRunning = "NotRunning"
+
+
+class PossibleModes:
+    BackTesting = "BackTesting"
+    RealTrading = "RealTrading"
+    RealTimeTest = "RealTimeTest"
+
+
+class PossibleSides:
+    Zeroed = "Zeroed"
+    Long = "Long"
+    Short = "Short"
+
+
+class PossibleSignals:
+    Hold = "Hold"
+    Buy = "Buy"
+    Sell = "Sell"
+    NakedSell = "NakedSell"
+    DoubleNakedSell = "DoubleNakedSell"
+    DoubleBuy = "DoubleBuy"
+    StoppedFromLong = "StoppedFromLong"
+    StoppedFromShort = "StoppedFromShort"
 
 
 class Default:
-    status = NotRunning
-    mode = BackTesting
-    classifier = CrossSMA
-    stop_loss = StopTrailing3T
+    trader = ImplementedTraders.DefaultTrader
+    classifier = ImplementedClassifiers.CrossSMA
+    stop_loss = ImplementedStopLosses.StopTrailing3T
+    status = PossibleStatuses.NotRunning
+    mode = PossibleModes.BackTesting
 
 
 kline_desired_informations = [
