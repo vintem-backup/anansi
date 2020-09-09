@@ -1,6 +1,7 @@
 from marketdata import klines
 import pendulum
 from .order_handler import *
+from ..settings import Modes
 
 
 class Logger:
@@ -9,6 +10,14 @@ class Logger:
 
 class OperationalReport:
     pass
+
+
+class Movement:
+    signal = None
+    base_asset_amount = None
+    timestamp = None
+    price = None
+    fee = None
 
 
 class DefaultTrader:
