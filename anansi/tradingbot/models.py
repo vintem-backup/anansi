@@ -1,31 +1,40 @@
 import os
 import pendulum
 from pony.orm import *
-from .mixins import *
 from ..settings import Default, ENVIRONMENT
-from ..share import tools
+#from ..share import tools
 
 db = Database()
 
 if ENVIRONMENT == "DEV":
-    _db_path = "{}/anansi.db".format(str(os.getcwd()))
-    db.bind('sqlite', _db_path, create_db=True)
-    sql_debug(True)
+    db_path = "{}/dev_tradingbot.db".format(str(os.getcwd()))
+    db.bind('sqlite', db_path, create_db=True)
+    # sql_debug(True)
 
 
-class Customer(db.Entity):
-    user_name = Required(str, unique=True)
-    operations = Set("Operation")
-    first_name = Required(str, default=None)
-    last_name = Required(str, default=None)
-    email = Required(str, unique=True, default=None)
+class User(db.Entity):
+    first_name = Required(str, unique=True)
+    last_name = Optional(str)
+    login_displayed_name = Optional(str)
+    email = Optional(str)
+    operations = Set("Operation", cascade_delete=True)
 
-    @db_session  # !Isto é só um teste de método que altera entrada no DB
-    def alter_name_to(self, new_name):
-        self.user_name = new_name
+    @db_session
+    def add(first_name: str, last_name="", email=""):
+        User(first_name=first_name,
+             last_name=last_name,
+             login_displayed_name="{}_{}".format(first_name, last_name),
+             email=email)
 
-    def get_name(self):  # !Isto é só um teste de método qualquer
-        return "{}".format(self.user_name)
+        return User
+
+
+@db_session
+def add_user(first_name: str, last_name="", login_displayed_name="", email=""):
+    User(first_name=first_name,
+         last_name=last_name,
+         login_displayed_name=login_displayed_name,
+         email=email)
 
 
 class Position(db.Entity):
@@ -36,42 +45,21 @@ class Position(db.Entity):
 
 
 class Wallet(db.Entity):
-    operation = Optional("Operation")
+    operation = Required("Operation")
     quote_asset_amount = Optional(float)
     base_asset_amount = Optional(float)
 
 
-class TradeMovement(db.Entity):
-    operation = Optional("Operation")
-    direction = Optional(str)  # buy, sell, naked_sell, n_buy (levarege), etc
-    enter_base_asset_amount = Optional(float)
-    enter_timestamp = Optional(int)
-    enter_price = Optional(float)
-    enter_fee = Optional(float)  # base asset units
-    exit_base_asset_amount = Optional(float)
-    exit_timestamp = Optional(int)
-    exit_price = Optional(float)
-    exit_fee = Optional(float)  # base asset units
-
-    # @db_session
-    # def movement_enter(self, price, fee):
-    #    self.enter_timestamp, self.enter_price, self.enter_fee = (
-    #        pendulum.now().int_timestamp, price, fee)
-
-    # @db_session
-    # def movement_exit(self, price, fee):
-    #    self.exit_timestamp, self.exit_price, self.exit_fee = (
-    #        pendulum.now().int_timestamp, price, fee)
-
-
-class Operation(db.Entity):  # , TraderMixin):
-    costumer = Required("Customer", columns=["user_name"])
-    position = Required("Position")
-    wallet = Required("Wallet")
-    movements = Set("TradeMovements")
+class Operation(db.Entity):
+    user = Required("User")
+    trader = Required(str, default=Default.trader)
+    position = Optional("Position", cascade_delete=True)
+    wallet = Optional("Wallet", cascade_delete=True)
+    #movements = Set("TradeMovement")
 
     status = Required(str, default=Default.status)
     mode = Required(str, default=Default.mode)
+    bypass_the_signal_if_recently_stopped = Required(bool, default=True)
 
     exchange = Required(str)
     symbol = Required(str)
@@ -80,7 +68,13 @@ class Operation(db.Entity):  # , TraderMixin):
     classifier_parameters = Optional(Json)
     stop_loss_name = Required(str, default=Default.stop_loss)
     stop_loss_parameters = Optional(Json)
-    last_round_timestamp = Required(int, default=None)
+
+    last_round_timestamp = Optional(int)
+
+
+@db_session
+def create_an_operation(user: User, exchange="Binance", symbol="BTCUSDT"):
+    Operation(user=user, exchange=exchange, symbol=symbol)
 
 
 db.generate_mapping(create_tables=True)
