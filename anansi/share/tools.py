@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import json
+from collections import namedtuple
 from functools import wraps, partial
 from time import time
 import pendulum
@@ -41,6 +43,20 @@ class ConvertTimeFrame:
 
     def to_seconds(self):
         return self.seconds_dict[self.time_frame]
+
+
+class Deserialize:
+    def __init__(self, name='X'):
+        self.name = name
+
+    def _json_object_hook(self, d):
+        return namedtuple(self.name, d.keys())(*d.values())
+
+    def json2obj(self, json_in):
+        return json.loads(json_in, object_hook=self._json_object_hook)
+
+    def dict2obj(self, dict_in):
+        return self.json2obj(json_in=json.dumps(dict_in))
 
 
 def timing(f):
