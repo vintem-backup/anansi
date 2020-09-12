@@ -112,7 +112,7 @@ class DataBroker:
         """
         raise NotImplementedError
 
-    def klines(
+    def get_klines(
         self,
         symbol: str,
         time_frame: str,
@@ -173,7 +173,7 @@ class BinanceDataWrapper(DataBroker, settings.Binance_):
         return False
 
     @doc_inherit
-    def klines(
+    def get_klines(
         self,
         symbol: str,
         time_frame: str,
