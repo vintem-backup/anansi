@@ -1,14 +1,17 @@
-from marketdata import klines
+from . import classifiers
+from ..marketdata import klines
 import pendulum
 from .order_handler import *
-from ..settings import Modes
+from ..settings import (PossibleSides as side,
+                        PossibleStatuses as stat, PossibleModes as mode)
 
 
 class Logger:
-    pass
+    def __init__(self, operation):
+        self.operation = operation
 
 
-class OperationalReport:
+class operationalReport:
     pass
 
 
@@ -22,35 +25,32 @@ class Movement:
 
 class DefaultTrader:
 
-    def __init__(self, Operation):
+    def __init__(self, operation):
 
-        self.Operation = Operation
+        self.operation = operation
         self._now = pendulum.now().int_timestamp
-        self.Operation.status == "Running"
+        self.operation.update_status_to(stat.Running)
 
-        self.Logger = Logger()
+        self.logger = Logger(operation=self.operation)
 
         self.Classifier = getattr(
-            classifiers, self.Operation.classifier_name)(
-                self.Operation.classifier_parameters)
+            classifiers, self.operation.classifier_name)(
+                operation=self.operation)
 
-        self.StopLoss = getattr(
-            stop_handlers, self.Operation.stop_loss_name)(
-                self.Operation.stop_loss_parameters)
+        # self.StopLoss = getattr(
+        #    stop_handlers, self.operation.stop_loss_name)(
+        #        operation=self.operation)
 
-        self.KStreamer = klines.FromBroker(  # Por hora, evocando da corretora
-            broker_name=self.Operation.exchange,
-            symbol=self.Operation.symbol
+        self.klines = klines.FromBroker(  # Por hora, evocando da corretora
+            broker_name=self.operation.exchange,
+            symbol=self.operation.symbol
         )
 
-        self.OrderHandler = OrderHandler(
-            broker_name=self.Operation.exchange,
-            symbol=self.Operation.symbol)
+        self.OrderHandler = OrderHandler(operation=self.operation)
 
-        if self.mode == "BackTesting":
-            self.Logger.level = "DEBUG"
-            self.KStreamer.time_frame = (
-                self.Operation.Classifier.parameters.time_frame)
+        if self.operation.mode == mode.BackTesting:
 
-            self._now = self.KStreamer.oldest(
-                number_of_candles=1).Open_time  # .to_timestamp
+            self.klines.time_frame = (
+                self.Classifier.parameters.time_frame)
+
+            self._now = self.klines._oldest_open_time()
