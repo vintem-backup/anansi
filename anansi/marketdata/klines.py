@@ -100,7 +100,7 @@ class FromBroker:
 
     def _oldest_open_time(self) -> int:
         return (
-            self._broker.klines(
+            self._broker.get_klines(
                 symbol=self.symbol,
                 time_frame=self._time_frame,
                 since=1,
@@ -121,7 +121,7 @@ class FromBroker:
                                self._request_step()):
             while True:
                 try:
-                    raw_klines = self._broker.klines(
+                    raw_klines = self._broker.get_klines(
                         self.symbol, self._time_frame, since=timestamp)
 
                     if appending_raw_to_db:
