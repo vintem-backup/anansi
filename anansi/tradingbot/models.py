@@ -1,15 +1,10 @@
-import os
-import pendulum
 from pony.orm import *
-from ..settings import Default, ENVIRONMENT
-#from ..share import tools
+from ..settings import Default, Environments, PossibleSides as side
 
-db = Database()
+db, env = Database(), Environments.ENV
 
-if ENVIRONMENT == "DEV":
-    db_path = "{}/dev_tradingbot.db".format(str(os.getcwd()))
-    db.bind('sqlite', db_path, create_db=True)
-    # sql_debug(True)
+db.bind(**env.DbParam)
+sql_debug(env.SqlDebug)
 
 
 class User(db.Entity):
@@ -20,32 +15,25 @@ class User(db.Entity):
     operations = Set("Operation", cascade_delete=True)
 
     @db_session
-    def add(first_name: str, last_name="", email=""):
-        User(first_name=first_name,
-             last_name=last_name,
-             login_displayed_name="{}_{}".format(first_name, last_name),
-             email=email)
-
-        return User
+    def update_first_name_to(self, new_first_name):
+        self.first_name = new_first_name
+        commit()
 
 
 @db_session
-def add_user(first_name: str, last_name="", login_displayed_name="", email=""):
-    User(first_name=first_name,
-         last_name=last_name,
-         login_displayed_name=login_displayed_name,
-         email=email)
+def create_user(**kwargs):
+    User(**kwargs)
 
 
 class Position(db.Entity):
     operation = Optional("Operation")
-    side = Optional(str)
-    suggested_side = Optional(str)
+    current_side = Optional(str)
+    hint_side = Optional(str)
     exit_reference_price = Optional(float)
 
 
 class Wallet(db.Entity):
-    operation = Required("Operation")
+    operation = Optional("Operation")
     quote_asset_amount = Optional(float)
     base_asset_amount = Optional(float)
 
@@ -55,14 +43,13 @@ class Operation(db.Entity):
     trader = Required(str, default=Default.trader)
     position = Optional("Position", cascade_delete=True)
     wallet = Optional("Wallet", cascade_delete=True)
-    #movements = Set("TradeMovement")
 
     status = Required(str, default=Default.status)
     mode = Required(str, default=Default.mode)
-    bypass_the_signal_if_recently_stopped = Required(bool, default=True)
+    bypass_if_recently_stopped = Required(bool, default=True)
 
-    exchange = Required(str)
-    symbol = Required(str)
+    exchange = Required(str, default=Default.exchange)
+    symbol = Required(str, default=Default.symbol)
 
     classifier_name = Required(str, default=Default.classifier)
     classifier_parameters = Optional(Json)
@@ -71,10 +58,15 @@ class Operation(db.Entity):
 
     last_round_timestamp = Optional(int)
 
+    @db_session
+    def update_status_to(self, new_status):
+        self.status = new_status
+        commit()
+
 
 @db_session
-def create_an_operation(user: User, exchange="Binance", symbol="BTCUSDT"):
-    Operation(user=user, exchange=exchange, symbol=symbol)
+def create_operation(**kwargs):
+    Operation(**kwargs)
 
 
 db.generate_mapping(create_tables=True)
