@@ -14,7 +14,6 @@ class User(db.Entity):
     email = Optional(str)
     operations = Set("Operation", cascade_delete=True)
 
-    @db_session
     def update_first_name_to(self, new_first_name):
         self.first_name = new_first_name
         commit()
@@ -30,22 +29,26 @@ class Position(db.Entity):
     current_side = Optional(str)
     hint_side = Optional(str)
     exit_reference_price = Optional(float)
-
-
-class Wallet(db.Entity):
-    operation = Optional("Operation")
     quote_asset_amount = Optional(float)
     base_asset_amount = Optional(float)
+
+    def update_current_side_to(self, new_current_side):
+        self.current_side = new_current_side
+        commit()
+
+    def update_hint_side_to(self, new_hint_side):
+        self.hint_side = new_hint_side
+        commit()
 
 
 class Operation(db.Entity):
     user = Required("User")
     trader = Required(str, default=Default.trader)
-    position = Optional("Position", cascade_delete=True)
-    wallet = Optional("Wallet", cascade_delete=True)
+    position = Required("Position", cascade_delete=True)
 
     status = Required(str, default=Default.status)
     mode = Required(str, default=Default.mode)
+    ignore_stop_loss = Required(bool, default=False)
     bypass_if_recently_stopped = Required(bool, default=True)
 
     exchange = Required(str, default=Default.exchange)
@@ -58,15 +61,25 @@ class Operation(db.Entity):
 
     last_round_timestamp = Optional(int)
 
-    @db_session
-    def update_status_to(self, new_status):
+    def update_status_to(self, new_status: str):
         self.status = new_status
+        commit()
+
+    def update_classifier_parameters_to(self, new_classifier_parameters):
+        self.classifier_parameters = new_classifier_parameters
         commit()
 
 
 @db_session
 def create_operation(**kwargs):
-    Operation(**kwargs)
+    position = {}
+
+    if not "position" in kwargs.keys():
+        position = {
+            'position': Position(current_side=side.Zeroed)
+        }
+
+    Operation(**{**kwargs, **position})
 
 
 db.generate_mapping(create_tables=True)
