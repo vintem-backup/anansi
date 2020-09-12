@@ -1,5 +1,25 @@
-ENVIRONMENT = "DEV"
+import os
 AUTO_START = False
+
+
+class Environments:
+
+    class Dev:
+        SqlDebug = False
+        _DbPath = "{}/dev_tradingbot.db".format(str(os.getcwd()))
+        DbParam = dict(provider='sqlite', filename=_DbPath, create_db=True)
+
+    class Staging:
+        SqlDebug = False
+        DbParam = dict(provider='postgres', user='',
+                       password='', host='', database='')
+
+    class Production:
+        SqlDebug = False
+        DbParam = dict(provider='postgres', user='',
+                       password='', host='', database='')
+
+    ENV = Dev
 
 
 class ImplementedTraders:
@@ -29,6 +49,7 @@ class PossibleSides:
     Zeroed = "Zeroed"
     Long = "Long"
     Short = "Short"
+    Classifying = "Classifying"
 
 
 class PossibleSignals:
@@ -48,6 +69,8 @@ class Default:
     stop_loss = ImplementedStopLosses.StopTrailing3T
     status = PossibleStatuses.NotRunning
     mode = PossibleModes.BackTesting
+    exchange = "Binance"
+    symbol = "BTCUSDT"
 
 
 kline_desired_informations = [
