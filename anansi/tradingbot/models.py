@@ -69,6 +69,10 @@ class Operation(db.Entity):
         self.classifier_parameters = new_classifier_parameters
         commit()
 
+    def update_stop_loss_parameters_to(self, new_stop_loss_parameters):
+        self.stop_loss_parameters = new_stop_loss_parameters
+        commit()
+
 
 @db_session
 def create_operation(**kwargs):
