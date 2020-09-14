@@ -62,7 +62,7 @@ class DefaultTrader:
         self.operation = operation
         self._now = pendulum.now().int_timestamp
         self.operation.update_status_to(stat.Running)
-        self.logger = Logger()
+        self.log = Log(operation=self.operation)
 
         self.Classifier = getattr(
             classifiers, self.operation.classifier_name)(
