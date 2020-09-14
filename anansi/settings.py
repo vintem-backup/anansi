@@ -53,6 +53,7 @@ class PossibleSides:
 
 
 class PossibleSignals:
+    IgnoredDueToRecentStop = "IgnoredDueToRecentStop"
     Hold = "Hold"
     Buy = "Buy"
     Sell = "Sell"
