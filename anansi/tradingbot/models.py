@@ -31,6 +31,7 @@ class Position(db.Entity):
     exit_reference_price = Optional(float)
     quote_asset_amount = Optional(float)
     base_asset_amount = Optional(float)
+    due_the_signal = Optional(str)
 
     def update_current_side_to(self, new_current_side):
         self.current_side = new_current_side
