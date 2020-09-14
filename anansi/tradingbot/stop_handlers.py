@@ -52,8 +52,7 @@ class StopTrailing3T:
         self.parameters = deserialize.json2obj(
             self.operation.stop_loss_parameters)
 
-    def how_many_candles(self) -> int:
-        return max(
+        self.NumberOfSamplesToAnalysis = max(
             self.parameters.first_trigger.treshold.n_measurements,
             self.parameters.second_trigger.treshold.n_measurements,
             self.parameters.third_trigger.treshold.n_measurements,
