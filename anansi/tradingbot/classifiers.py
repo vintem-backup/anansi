@@ -26,5 +26,9 @@ class CrossSMA:
         self.parameters = deserialize.json2obj(
             self.operation.classifier_parameters)
 
-    def how_many_candles(self) -> int:
-        return self.parameters.larger_sample
+        self.NumberOfSamplesToAnalysis = self.parameters.larger_sample
+
+        self.data_to_analyze = None
+
+    def perform_analysis(self):
+        print(self.data_to_analyze[-1:])
