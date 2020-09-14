@@ -1,4 +1,5 @@
 import pendulum
+import pandas as pd
 from .order_handler import *
 from . import classifiers, stop_handlers, order_handler
 from ..marketdata import klines
@@ -7,13 +8,43 @@ from ..settings import (PossibleSides as side,
                         PossibleStatuses as stat, PossibleModes as mode)
 
 
-class Logger:
+class Log:
+
     def __init__(self, operation):
         self.operation = operation
+        self.analyzed_data = None
+        self.analyzer = None
+        self.current_side = None
+        self.hint_side = None
+        self.signal = None
+        self.exit_price = None
+        self.quote = None
+        self.base = None
 
+    def consolidate(self):
+        """Cria um só dataframe (linha), com os atributos de interesse durante o
+        ciclo + dados - OHLCV - (no caso de back testing).
+        """
 
-class operationalReport:
-    pass
+        self.log_dataframe = self.analyzed_data.assign(
+            analyzer=self.analyzer,
+            current_side=self.current_side,
+            hint_side=self.hint_side,
+            signal=self.signal,
+            exit_price=self.exit_price,
+            quote=self.quote,
+            base=self.base)
+
+        return self.log_dataframe
+
+    def append_to_db(self):
+        pass
+
+    def get_from_db(self, number_of_lines):
+        pass
+
+    def show(self, number_of_lines):
+        pass
 
 
 class Movement:
@@ -31,7 +62,7 @@ class DefaultTrader:
         self.operation = operation
         self._now = pendulum.now().int_timestamp
         self.operation.update_status_to(stat.Running)
-        self.logger = Logger(operation=self.operation)
+        self.logger = Logger()
 
         self.Classifier = getattr(
             classifiers, self.operation.classifier_name)(
@@ -67,7 +98,7 @@ class DefaultTrader:
     def _initial_now_for_backtesting(self):
         return (self.KlinesGetter._oldest_open_time()
                 + (self.step_for_Classifier *
-                   self.Classifier.how_many_candles()))
+                   self.Classifier.NumberOfSamplesToAnalysis))
 
     def _get_ready_to_repeat(self):
         if self.operation.mode == mode.BackTesting:
@@ -89,10 +120,20 @@ class DefaultTrader:
         self._classifier_analysis()
 
     def _stop_analysis(self):
-        pass
+        print("Finally stop alalysis! But, nothing here :/")
 
     def _classifier_analysis(self):
-        pass
+        # TODO: Acresentar "trava" de último candle analisado
+        self._analyze_for(self.Classifier)
+
+    def _analyze_for(self, Analyzer):
+        self.KlinesGetter.time_frame = Analyzer.parameters.time_frame
+
+        Analyzer.data_to_analyze = self.KlinesGetter._get_n_until(
+            number_of_candles=Analyzer.NumberOfSamplesToAnalysis,
+            until=self._now)
+
+        Analyzer.perform_analysis()
 
     def run(self):
         while self.operation.status == stat.Running:
