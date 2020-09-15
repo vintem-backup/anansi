@@ -72,7 +72,6 @@ my_trader = traders.DefaultTrader(operation=my_op)
 #### An operation attribute test
 
 ```python
-
 my_op.stop_loss.name
 ```
 
@@ -97,10 +96,6 @@ before_update, after_update
 ```
 
     (('Zeroed', None), ('Long', 1020.94))
-
-```python
-
-```
 
 ### Klines treated and ready for use - including market indicators methods - using the module "*klines*"
 
@@ -924,7 +919,3 @@ my_klines
 </table>
 <p>499 rows × 12 columns</p>
 </div>
-
-```python
-
-```
