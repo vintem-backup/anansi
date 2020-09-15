@@ -71,7 +71,10 @@ class Default:
     status = PossibleStatuses.NotRunning
     mode = PossibleModes.BackTesting
     exchange = "Binance"
-    symbol = "BTCUSDT"
+    ticker_symbol = "BTCUSDT"
+    side = PossibleSides.Zeroed
+    initial_base_asset = 100
+    initial_quote_asset = 0.0
 
 
 kline_desired_informations = [
