@@ -1,6 +1,5 @@
 import json
 from ..share import tools
-#convert = tools.ConvertTimeFrame
 deserialize = tools.Deserialize()
 
 
@@ -40,21 +39,15 @@ class StopTrailing3T:
                 rate=0.7,
                 treshold=Treshold(n_measurements=10, n_positives=3))
 
-    def __init__(self, operation):
-        self.operation = operation
-
-        if not self.operation.stop_loss_parameters:
-            self.operation.update_stop_loss_parameters_to(
-                json.dumps(self.DefaultParameters(),
-                           default=lambda o: o.__dict__, indent=4)
-            )
-
-        self.parameters = deserialize.json2obj(
-            self.operation.stop_loss_parameters)
-
-        self.NumberOfSamplesToAnalysis = max(
+    def __init__(self, parameters, data_to_analyze=None):
+        self.parameters = deserialize.json2obj(parameters)
+        self.data_to_analyze = data_to_analyze
+        self.n_samples_to_analyze = max(
             self.parameters.first_trigger.treshold.n_measurements,
             self.parameters.second_trigger.treshold.n_measurements,
             self.parameters.third_trigger.treshold.n_measurements,
             self.parameters.update_target_if.treshold.n_measurements,
         )
+
+    def define_side(self):
+        pass
