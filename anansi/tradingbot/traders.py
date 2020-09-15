@@ -1,6 +1,7 @@
 import pendulum
 import pandas as pd
 from .order_handler import *
+from .models import Log
 from . import classifiers, stop_handlers, order_handler
 from ..marketdata import klines
 from ..share.tools import ConvertTimeFrame
@@ -8,97 +9,49 @@ from ..settings import (PossibleSides as side,
                         PossibleStatuses as stat, PossibleModes as mode)
 
 
-class Log:
-
-    def __init__(self, operation):
-        self.operation = operation
-        self.analyzed_data = None
-        self.analyzer = None
-        self.current_side = None
-        self.hint_side = None
-        self.signal = None
-        self.exit_price = None
-        self.quote = None
-        self.base = None
-
-    def consolidate(self):
-        """Cria um só dataframe (linha), com os atributos de interesse durante o
-        ciclo + dados - OHLCV - (no caso de back testing).
-        """
-
-        self.log_dataframe = self.analyzed_data.assign(
-            analyzer=self.analyzer,
-            current_side=self.current_side,
-            hint_side=self.hint_side,
-            signal=self.signal,
-            exit_price=self.exit_price,
-            quote=self.quote,
-            base=self.base)
-
-        return self.log_dataframe
-
-    def append_to_db(self):
-        pass
-
-    def get_from_db(self, number_of_lines):
-        pass
-
-    def show(self, number_of_lines):
-        pass
-
-
-class Movement:
-    signal = None
-    base_asset_amount = None
-    timestamp = None
-    price = None
-    fee = None
-
-
 class DefaultTrader:
-
     def __init__(self, operation):
-        self._step = None
         self.operation = operation
-        self._now = pendulum.now().int_timestamp
-        self.operation.update_status_to(stat.Running)
         self.log = Log(operation=self.operation)
+        self._step = None
+        self._hint_side = None
 
         self.Classifier = getattr(
-            classifiers, self.operation.classifier_name)(
-                operation=self.operation)
+            classifiers, self.operation.classifier.name)(
+                parameters=self.operation.classifier.parameters)
 
-        self.StopLoss = getattr(
-            stop_handlers, self.operation.stop_loss_name)(
-                operation=self.operation)
-
-        self.step_for_Classifier = (
+        self._classifier_time_frame_in_seconds = (
             ConvertTimeFrame(
                 self.Classifier.parameters.time_frame).to_seconds())
 
-        self.step_for_StopLoss = (
-            ConvertTimeFrame(
-                self.StopLoss.parameters.time_frame).to_seconds())
+        if self.operation.stop_on:
+            self.StopLoss = getattr(
+                stop_handlers, self.operation.stop_loss.name)(
+                    parameters=self.operation.stop_loss.parameters)
+
+            self._stop_loss_time_frame_in_seconds = (
+                ConvertTimeFrame(
+                    self.StopLoss.parameters.time_frame).to_seconds())
 
         self.KlinesGetter = klines.FromBroker(  # Por hora, evocando da corretora
-            broker_name=self.operation.exchange,
-            symbol=self.operation.symbol)
+            broker_name=self.operation.market.exchange,
+            symbol=self.operation.market.ticker_symbol)
+
+        self._now = (
+            self._initial_now_for_backtesting()
+            if self.operation.mode == mode.BackTesting
+            else pendulum.now().int_timestamp)
 
         self.OrderHandler = (
             order_handler.OrderHandler(operation=self.operation))
 
-        if self.operation.mode == mode.BackTesting:
-            self.KlinesGetter.time_frame = (
-                self.Classifier.parameters.time_frame)
-
-            self._now = self._initial_now_for_backtesting()
-
-            self.operation.position.update_current_side_to(side.Zeroed)
-
     def _initial_now_for_backtesting(self):
+        self.KlinesGetter.time_frame = (
+            self.Classifier.parameters.time_frame)
+
         return (self.KlinesGetter._oldest_open_time()
-                + (self.step_for_Classifier *
-                   self.Classifier.NumberOfSamplesToAnalysis))
+                + (self._classifier_time_frame_in_seconds *
+                   self.Classifier.n_samples_to_analyze))
 
     def _get_ready_to_repeat(self):
         if self.operation.mode == mode.BackTesting:
@@ -108,14 +61,14 @@ class DefaultTrader:
             self._now = pendulum.now().int_timestamp
 
     def _do_analysis(self):
-        if (not self.operation.ignore_stop_loss) and (
-                self.operation.position.current_side != side.Zeroed):
+        if (self.operation.stop_on) and (
+                self.operation.position.side.held != side.Zeroed):
 
             self._step = self._step_for_StopLoss
             self._stop_analysis()
 
         else:
-            self._step = self.step_for_Classifier
+            self._step = self._classifier_time_frame_in_seconds
 
         self._classifier_analysis()
 
@@ -130,12 +83,14 @@ class DefaultTrader:
         self.KlinesGetter.time_frame = Analyzer.parameters.time_frame
 
         Analyzer.data_to_analyze = self.KlinesGetter._get_n_until(
-            number_of_candles=Analyzer.NumberOfSamplesToAnalysis,
+            number_of_candles=Analyzer.n_samples_to_analyze,
             until=self._now)
 
-        Analyzer.perform_analysis()
+        self._hint_side = Analyzer.define_side()
 
     def run(self):
+        self.operation.update(status=stat.Running)
+
         while self.operation.status == stat.Running:
             self._do_analysis()
             self._get_ready_to_repeat()
