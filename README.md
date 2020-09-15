@@ -17,8 +17,6 @@ Perform the commands:
     poetry run python -m ipykernel install --user --name=$(basename $(pwd))
     poetry run jupyter notebook > jupyterlog 2>&1 &
 
-Start your own notebook, or open the 'TryAnansi.ipynb' to see the source notebook of the below 'how to'.
-
 ## Draft "how to"
 
 ### Playing with the database models
@@ -30,17 +28,18 @@ from anansi.tradingbot import traders
 from anansi.tradingbot.views import create_user, create_default_operation
 ```
 
+#### Add new user
+
 ```python
-# Add new user
 my_user_first_name = "John"
 
 create_user(first_name=my_user_first_name,
                    last_name="Doe",
                    email = "{}@email.com".format(my_user_first_name.lower()))
 ```
-
+#### Getting all users
 ```python
-# Getting all users
+
 users = select(user for user in User)
 users.show()
 ```
@@ -49,8 +48,8 @@ users.show()
     --+----------+---------+--------------------+--------------
     1 |John      |Doe      |                    |john@email.com
 
+#### Creating a default operation
 ```python
-# Creating a default operation
 my_user = User[1]
 create_default_operation(user=my_user)
 ```
@@ -67,23 +66,24 @@ my_user.first_name
 my_op = Operation.get(id=1)
 my_trader = traders.DefaultTrader(operation=my_op)
 ```
-
+#### An operation attribute test
 ```python
-# An operation attribute test
+
 my_op.stop_loss.name
 ```
 
     'StopTrailing3T'
-
+#### A trader attribute test
 ```python
-# A trader attribute test
+
 my_trader.Classifier.parameters.time_frame
 ```
 
     '6h'
 
+#### Some random update method test
 ```python
-# Some random update method test
+
 before_update = my_trader.operation.position.side, my_trader.operation.position.exit_reference_price
 
 my_trader.operation.position.update(side="Long", exit_reference_price=1020.94)
