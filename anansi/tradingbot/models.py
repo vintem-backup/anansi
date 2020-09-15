@@ -1,5 +1,5 @@
 from pony.orm import *
-from ..settings import Default, Environments, PossibleSides as side
+from ..settings import Default, Environments
 
 db, env = Database(), Environments.ENV
 
@@ -7,84 +7,122 @@ db.bind(**env.DbParam)
 sql_debug(env.SqlDebug)
 
 
-class User(db.Entity):
+class AttributeUpdater(object):
+    def update(self, **kwargs):
+        for item in kwargs.items():
+            setattr(self, item[0], item[1])
+            commit()
+
+
+class User(db.Entity, AttributeUpdater):
     first_name = Required(str, unique=True)
     last_name = Optional(str)
     login_displayed_name = Optional(str)
     email = Optional(str)
     operations = Set("Operation", cascade_delete=True)
 
-    def update_first_name_to(self, new_first_name):
-        self.first_name = new_first_name
-        commit()
+
+class Wallet(db.Entity, AttributeUpdater):
+    position = Optional("Operation")
+    initial_quote_asset = Required(float, default=Default.initial_quote_asset)
+    initial_base_asset = Required(float, default=Default.initial_base_asset)
+    quote_asset = Optional(float)
+    base_asset = Optional(float)
 
 
-@db_session
-def create_user(**kwargs):
-    User(**kwargs)
-
-
-class Position(db.Entity):
+class Position(db.Entity, AttributeUpdater):
     operation = Optional("Operation")
-    current_side = Optional(str)
-    hint_side = Optional(str)
+    side = Required(str, default=Default.side)
     exit_reference_price = Optional(float)
-    quote_asset_amount = Optional(float)
-    base_asset_amount = Optional(float)
     due_the_signal = Optional(str)
 
-    def update_current_side_to(self, new_current_side):
-        self.current_side = new_current_side
-        commit()
 
-    def update_hint_side_to(self, new_hint_side):
-        self.hint_side = new_hint_side
-        commit()
+class Classifier(db.Entity, AttributeUpdater):
+    operation = Optional("Operation")
+    name = Required(str)
+    parameters = Optional(Json)
 
 
-class Operation(db.Entity):
+class StopLoss(db.Entity, AttributeUpdater):
+    operation = Optional("Operation")
+    name = Required(str)
+    parameters = Optional(Json)
+
+
+class Market(db.Entity):
+    operation = Optional("Operation")
+    exchange = Required(str, default=Default.exchange)
+    ticker_symbol = Required(str, default=Default.ticker_symbol)
+
+
+class LastCheck(db.Entity, AttributeUpdater):
+    Operation = Optional("Operation")
+    by = Optional(str)  # Classifier or StopLoss name
+    at = Optional(int)  # timestamp
+
+
+class Operation(db.Entity, AttributeUpdater):
     user = Required("User")
     trader = Required(str, default=Default.trader)
     position = Required("Position", cascade_delete=True)
+    market = Required("Market", cascade_delete=True)
+    wallet = Required("Wallet", cascade_delete=True)
+    classifier = Required("Classifier", cascade_delete=True)
+    stop_loss = Required("StopLoss", cascade_delete=True)
 
     status = Required(str, default=Default.status)
     mode = Required(str, default=Default.mode)
-    ignore_stop_loss = Required(bool, default=False)
-    bypass_if_recently_stopped = Required(bool, default=True)
+    stop_on = Required(bool, default=True)
+    hold_if_stopped = Required(bool, default=True)
 
-    exchange = Required(str, default=Default.exchange)
-    symbol = Required(str, default=Default.symbol)
-
-    classifier_name = Required(str, default=Default.classifier)
-    classifier_parameters = Optional(Json)
-    stop_loss_name = Required(str, default=Default.stop_loss)
-    stop_loss_parameters = Optional(Json)
-
-    last_round_timestamp = Optional(int)
-
-    def update_status_to(self, new_status: str):
-        self.status = new_status
-        commit()
-
-    def update_classifier_parameters_to(self, new_classifier_parameters):
-        self.classifier_parameters = new_classifier_parameters
-        commit()
-
-    def update_stop_loss_parameters_to(self, new_stop_loss_parameters):
-        self.stop_loss_parameters = new_stop_loss_parameters
-        commit()
+    last_check = Required("LastCheck")
 
 
-@db_session
-def create_operation(**kwargs):
-    position = {}
+class Log:
 
-    if not "position" in kwargs.keys():
-        position = {
-            'position': Position(current_side=side.Zeroed)
-        }
+    def __init__(self, operation):
+        self.operation = operation
+        self.analyzed_data = None
+        self.analyzer = None
+        self.current_side = None
+        self.hint_side = None
+        self.signal = None
+        self.exit_price = None
+        self.quote = None
+        self.base = None
 
-    Operation(**{**kwargs, **position})
+    def consolidate(self):
+        """Cria um só dataframe (linha), com os atributos de interesse durante o
+        ciclo + dados - OHLCV - (no caso de back testing).
+        """
+
+        self.log_dataframe = self.analyzed_data.assign(
+            analyzer=self.analyzer,
+            current_side=self.current_side,
+            hint_side=self.hint_side,
+            signal=self.signal,
+            exit_price=self.exit_price,
+            quote=self.quote,
+            base=self.base)
+
+        return self.log_dataframe
+
+    def append_to_db(self):
+        pass
+
+    def get_from_db(self, number_of_lines):
+        pass
+
+    def show(self, number_of_lines):
+        pass
+
+
+class Movement:
+    signal = None
+    base_asset_amount = None
+    timestamp = None
+    price = None
+    fee = None
 
 
 db.generate_mapping(create_tables=True)
