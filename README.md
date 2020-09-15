@@ -37,7 +37,9 @@ create_user(first_name=my_user_first_name,
                    last_name="Doe",
                    email = "{}@email.com".format(my_user_first_name.lower()))
 ```
+
 #### Getting all users
+
 ```python
 
 users = select(user for user in User)
@@ -49,6 +51,7 @@ users.show()
     1 |John      |Doe      |                    |john@email.com
 
 #### Creating a default operation
+
 ```python
 my_user = User[1]
 create_default_operation(user=my_user)
@@ -66,14 +69,18 @@ my_user.first_name
 my_op = Operation.get(id=1)
 my_trader = traders.DefaultTrader(operation=my_op)
 ```
+
 #### An operation attribute test
+
 ```python
 
 my_op.stop_loss.name
 ```
 
     'StopTrailing3T'
+
 #### A trader attribute test
+
 ```python
 
 my_trader.Classifier.parameters.time_frame
@@ -82,6 +89,7 @@ my_trader.Classifier.parameters.time_frame
     '6h'
 
 #### Some random update method test
+
 ```python
 
 before_update = my_trader.operation.position.side, my_trader.operation.position.exit_reference_price
