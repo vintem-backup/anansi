@@ -1,6 +1,5 @@
 import json
 from ..share import tools
-#convert = tools.ConvertTimeFrame
 deserialize = tools.Deserialize()
 
 
@@ -14,21 +13,10 @@ class CrossSMA:
             self.smaller_sample = 3
             self.larger_sample = 80
 
-    def __init__(self, operation):
-        self.operation = operation
+    def __init__(self, parameters, data_to_analyze=None):
+        self.parameters = deserialize.json2obj(parameters)
+        self.data_to_analyze = data_to_analyze
+        self.n_samples_to_analyze = self.parameters.larger_sample
 
-        if not self.operation.classifier_parameters:
-            self.operation.update_classifier_parameters_to(
-                json.dumps(self.DefaultParameters(),
-                           default=lambda o: o.__dict__, indent=4)
-            )
-
-        self.parameters = deserialize.json2obj(
-            self.operation.classifier_parameters)
-
-        self.NumberOfSamplesToAnalysis = self.parameters.larger_sample
-
-        self.data_to_analyze = None
-
-    def perform_analysis(self):
+    def define_side(self):
         print(self.data_to_analyze[-1:])
