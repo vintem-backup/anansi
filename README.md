@@ -41,7 +41,6 @@ create_user(first_name=my_user_first_name,
 #### Getting all users
 
 ```python
-
 users = select(user for user in User)
 users.show()
 ```
@@ -82,7 +81,6 @@ my_op.stop_loss.name
 #### A trader attribute test
 
 ```python
-
 my_trader.Classifier.parameters.time_frame
 ```
 
@@ -91,11 +89,8 @@ my_trader.Classifier.parameters.time_frame
 #### Some random update method test
 
 ```python
-
 before_update = my_trader.operation.position.side, my_trader.operation.position.exit_reference_price
-
 my_trader.operation.position.update(side="Long", exit_reference_price=1020.94)
-
 after_update = my_trader.operation.position.side, my_trader.operation.position.exit_reference_price
 
 before_update, after_update
