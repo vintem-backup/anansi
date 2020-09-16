@@ -20,7 +20,8 @@ def DefaultStopLossParameters():
 
 @db_session
 def create_user(**kwargs):
-    User(**kwargs)
+    wallet = Wallet(assets=Default.initial_assets)
+    User(**kwargs, wallet=wallet)
 
 
 @db_session
@@ -30,7 +31,6 @@ def create_default_operation(user):
         user=user,
         market=Market(),
         position=Position(),
-        wallet=Wallet(),
         last_check=LastCheck(),
         classifier=Classifier(
             name=Default.classifier, parameters=DefaultClassifierParameters()
