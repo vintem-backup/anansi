@@ -5,8 +5,11 @@ from .models import Log
 from . import classifiers, stop_handlers, order_handler
 from ..marketdata import klines
 from ..share.tools import ConvertTimeFrame
-from ..settings import (PossibleSides as side,
-                        PossibleStatuses as stat, PossibleModes as mode)
+from ..settings import (
+    PossibleSides as side,
+    PossibleStatuses as stat,
+    PossibleModes as mode,
+)
 
 
 class DefaultTrader:
@@ -16,42 +19,45 @@ class DefaultTrader:
         self._step = None
         self._hint_side = None
 
-        self.Classifier = getattr(
-            classifiers, self.operation.classifier.name)(
-                parameters=self.operation.classifier.parameters)
+        self.Classifier = getattr(classifiers, self.operation.classifier.name)(
+            parameters=self.operation.classifier.parameters
+        )
 
-        self._classifier_time_frame_in_seconds = (
-            ConvertTimeFrame(
-                self.Classifier.parameters.time_frame).to_seconds())
+        self._classifier_time_frame_in_seconds = ConvertTimeFrame(
+            self.Classifier.parameters.time_frame
+        ).to_seconds()
 
-        if self.operation.stop_on:
-            self.StopLoss = getattr(
-                stop_handlers, self.operation.stop_loss.name)(
-                    parameters=self.operation.stop_loss.parameters)
+        self.StopLoss = getattr(stop_handlers, self.operation.stop_loss.name)(
+            parameters=self.operation.stop_loss.parameters
+        )
 
-            self._stop_loss_time_frame_in_seconds = (
-                ConvertTimeFrame(
-                    self.StopLoss.parameters.time_frame).to_seconds())
+        self._stop_loss_time_frame_in_seconds = ConvertTimeFrame(
+            self.StopLoss.parameters.time_frame
+        ).to_seconds()
 
         self.KlinesGetter = klines.FromBroker(  # Por hora, evocando da corretora
             broker_name=self.operation.market.exchange,
-            symbol=self.operation.market.ticker_symbol)
+            symbol=(
+                self.operation.market.ticker_symbol
+                + self.operation.market.quote_symbol)
+        )
 
         self._now = (
             self._initial_now_for_backtesting()
             if self.operation.mode == mode.BackTesting
-            else pendulum.now().int_timestamp)
+            else pendulum.now().int_timestamp
+        )
 
-        self.OrderHandler = (
-            order_handler.OrderHandler(operation=self.operation))
+        self.OrderHandler = order_handler.OrderHandler(
+            operation=self.operation)
 
     def _initial_now_for_backtesting(self):
-        self.KlinesGetter.time_frame = (
-            self.Classifier.parameters.time_frame)
+        self.KlinesGetter.time_frame = self.Classifier.parameters.time_frame
 
-        return (self.KlinesGetter._oldest_open_time()
-                + (self._classifier_time_frame_in_seconds *
-                   self.Classifier.n_samples_to_analyze))
+        return self.KlinesGetter._oldest_open_time() + (
+            self._classifier_time_frame_in_seconds
+            * self.Classifier.n_samples_to_analyze
+        )
 
     def _get_ready_to_repeat(self):
         if self.operation.mode == mode.BackTesting:
@@ -62,7 +68,8 @@ class DefaultTrader:
 
     def _do_analysis(self):
         if (self.operation.stop_on) and (
-                self.operation.position.side.held != side.Zeroed):
+            self.operation.position.side.held != side.Zeroed
+        ):
 
             self._step = self._step_for_StopLoss
             self._stop_analysis()
@@ -83,8 +90,8 @@ class DefaultTrader:
         self.KlinesGetter.time_frame = Analyzer.parameters.time_frame
 
         Analyzer.data_to_analyze = self.KlinesGetter._get_n_until(
-            number_of_candles=Analyzer.n_samples_to_analyze,
-            until=self._now)
+            number_of_candles=Analyzer.n_samples_to_analyze, until=self._now
+        )
 
         self._hint_side = Analyzer.define_side()
 
