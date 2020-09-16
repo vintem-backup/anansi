@@ -20,19 +20,18 @@ class User(db.Entity, AttributeUpdater):
     login_displayed_name = Optional(str)
     email = Optional(str)
     operations = Set("Operation", cascade_delete=True)
+    wallet = Required("Wallet", cascade_delete=True)
 
 
 class Wallet(db.Entity, AttributeUpdater):
-    position = Optional("Operation")
-    initial_quote_asset = Required(float, default=Default.initial_quote_asset)
-    initial_base_asset = Required(float, default=Default.initial_base_asset)
-    quote_asset = Optional(float)
-    base_asset = Optional(float)
+    user = Optional("User")
+    assets = Optional(Json)
 
 
 class Position(db.Entity, AttributeUpdater):
     operation = Optional("Operation")
     side = Required(str, default=Default.side)
+    quote_amount = Optional(float)
     exit_reference_price = Optional(float)
     due_the_signal = Optional(str)
 
@@ -53,6 +52,7 @@ class Market(db.Entity):
     operation = Optional("Operation")
     exchange = Required(str, default=Default.exchange)
     ticker_symbol = Required(str, default=Default.ticker_symbol)
+    quote_symbol = Required(str, default=Default.quote_symbol)
 
 
 class LastCheck(db.Entity, AttributeUpdater):
@@ -66,7 +66,6 @@ class Operation(db.Entity, AttributeUpdater):
     trader = Required(str, default=Default.trader)
     position = Required("Position", cascade_delete=True)
     market = Required("Market", cascade_delete=True)
-    wallet = Required("Wallet", cascade_delete=True)
     classifier = Required("Classifier", cascade_delete=True)
     stop_loss = Required("StopLoss", cascade_delete=True)
 
