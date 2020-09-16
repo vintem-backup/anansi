@@ -53,7 +53,7 @@ class PossibleSides:
 
 
 class PossibleSignals:
-    IgnoredDueToRecentStop = "IgnoredDueToRecentStop"
+    StopPassed = "StopPassed"
     Hold = "Hold"
     Buy = "Buy"
     Sell = "Sell"
@@ -71,10 +71,12 @@ class Default:
     status = PossibleStatuses.NotRunning
     mode = PossibleModes.BackTesting
     exchange = "Binance"
-    ticker_symbol = "BTCUSDT"
+    ticker_symbol = "BTC"
+    quote_symbol = "USDT"
     side = PossibleSides.Zeroed
-    initial_base_asset = 100
-    initial_quote_asset = 0.0
+    initial_assets = {
+        'BTC': 0.0,
+        'USDT': 100.00}
 
 
 kline_desired_informations = [
