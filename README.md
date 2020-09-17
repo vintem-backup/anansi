@@ -4,9 +4,9 @@
 
 Python, Pip, Poetry.
 
-To install (poetry)[https://python-poetry.org/] with pip (supposing you have python and pip already installed):
+To install [poetry](https://python-poetry.org/) with pip (supposing you have python and pip already installed):
 
-  pip install poetry
+    pip install poetry
 
 ## Consuming on Jupyter notebook
 
