@@ -5,19 +5,22 @@ AUTO_START = False
 class Environments:
 
     class Dev:
+        print_current_round_log = True
         SqlDebug = False
         _DbPath = "{}/dev_tradingbot.db".format(str(os.getcwd()))
-        DbParam = dict(provider='sqlite', filename=_DbPath, create_db=True)
+        ORM_bind_to = dict(provider='sqlite', filename=_DbPath, create_db=True)
 
     class Staging:
+        print_current_round_log = False
         SqlDebug = False
-        DbParam = dict(provider='postgres', user='',
-                       password='', host='', database='')
+        ORM_bind_to = dict(provider='postgres', user='',
+                           password='', host='', database='')
 
     class Production:
+        print_current_round_log = False
         SqlDebug = False
-        DbParam = dict(provider='postgres', user='',
-                       password='', host='', database='')
+        ORM_bind_to = dict(provider='postgres', user='',
+                           password='', host='', database='')
 
     ENV = Dev
 
