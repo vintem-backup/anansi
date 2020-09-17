@@ -18,5 +18,5 @@ class CrossSMA:
         self.data_to_analyze = data_to_analyze
         self.n_samples_to_analyze = self.parameters.larger_sample
 
-    def define_side(self):
-        print(self.data_to_analyze[-1:])
+    def result(self):
+        return self.data_to_analyze[-1:]
