@@ -2,8 +2,8 @@
 
 ## Dependencies
 
-- Python
-- Poetry
+> Python
+> Poetry
 
     pip install poetry
 
