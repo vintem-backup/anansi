@@ -1,7 +1,7 @@
 import pendulum
 import pandas as pd
 from .order_handler import *
-from .models import Log
+from .models import Logger
 from . import classifiers, stop_handlers, order_handler
 from ..marketdata import klines
 from ..share.tools import ConvertTimeFrame
@@ -15,7 +15,7 @@ from ..settings import (
 class DefaultTrader:
     def __init__(self, operation):
         self.operation = operation
-        self.log = Log(operation=self.operation)
+        self.logger = Logger(operation=self.operation)
         self._step = None
         self._hint_side = None
 
@@ -68,7 +68,7 @@ class DefaultTrader:
 
     def _do_analysis(self):
         if (self.operation.stop_on) and (
-            self.operation.position.side.held != side.Zeroed
+            self.operation.position.side != side.Zeroed
         ):
 
             self._step = self.self._stop_loss_time_frame_in_seconds
@@ -85,6 +85,8 @@ class DefaultTrader:
     def _classifier_analysis(self):
         # TODO: Acresentar "trava" de último candle analisado
         self._analyze_for(self.Classifier)
+        self.logger.analysis_result = self.analysis_result
+        self.logger.consolidate_log()
 
     def _analyze_for(self, Analyzer):
         self.KlinesGetter.time_frame = Analyzer.parameters.time_frame
@@ -93,7 +95,8 @@ class DefaultTrader:
             number_of_candles=Analyzer.n_samples_to_analyze, until=self._now
         )
 
-        self._hint_side = Analyzer.define_side()
+        #self._hint_side = Analyzer.define_side()
+        self.analysis_result = Analyzer.result()
 
     def run(self):
         self.operation.update(status=stat.Running)
