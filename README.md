@@ -2,10 +2,11 @@
 
 ## Dependencies
 
-> Python
-> Poetry
+1 - Python
 
-    pip install poetry
+2 - Poetry
+
+  pip install poetry
 
 ## Consuming on Jupyter notebook
 
