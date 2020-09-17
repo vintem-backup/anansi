@@ -1,9 +1,11 @@
+import pandas as pd
 from pony.orm import *
 from ..settings import Default, Environments
+from ..share.db_handlers import LogStorage
 
 db, env = Database(), Environments.ENV
 
-db.bind(**env.DbParam)
+db.bind(**env.ORM_bind_to)
 sql_debug(env.SqlDebug)
 
 
@@ -77,20 +79,22 @@ class Operation(db.Entity, AttributeUpdater):
     last_check = Required("LastCheck")
 
 
-class Log:
-
+class Logger:
     def __init__(self, operation):
         self.operation = operation
-        self.analyzed_data = None
-        self.analyzer = None
-        self.current_side = None
-        self.hint_side = None
-        self.signal = None
-        self.exit_price = None
-        self.quote = None
-        self.base = None
+        self.analysis_result = None
 
-    def consolidate(self):
+    def consolidate_log(self):
+        storage = LogStorage(
+            table_name="log_operation_id_{}".format(self.operation.id))
+
+        storage.append_dataframe(self.analysis_result)
+
+        if env.print_current_round_log:
+            print(self.analysis_result)
+        # return self.analysis_result
+
+    def BKP_consolidate_log(self):
         """Cria um só dataframe (linha), com os atributos de interesse durante o
         ciclo + dados - OHLCV - (no caso de back testing).
         """
