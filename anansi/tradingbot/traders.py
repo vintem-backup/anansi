@@ -71,7 +71,7 @@ class DefaultTrader:
             self.operation.position.side.held != side.Zeroed
         ):
 
-            self._step = self._step_for_StopLoss
+            self._step = self.self._stop_loss_time_frame_in_seconds
             self._stop_analysis()
 
         else:
