@@ -49,5 +49,5 @@ class StopTrailing3T:
             self.parameters.update_target_if.treshold.n_measurements,
         )
 
-    def define_side(self):
+    def result(self):
         pass
