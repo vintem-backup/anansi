@@ -2,9 +2,9 @@
 
 ## Dependencies
 
-1 - Python
+Python, Pip, Poetry.
 
-2 - Poetry
+To install (poetry)[https://python-poetry.org/] with pip (supposing you have python and pip already installed):
 
   pip install poetry
 
