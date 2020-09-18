@@ -19,4 +19,24 @@ class CrossSMA:
         self.n_samples_to_analyze = self.parameters.larger_sample
 
     def result(self):
-        return self.data_to_analyze[-1:]
+        side = "short"
+        self.data_to_analyze.apply_indicator.price._given(
+            price_source=self.parameters.price_source,
+            indicator_column="price_{}".format(self.parameters.price_source))
+
+        smaller_SMA = (
+            self.data_to_analyze.apply_indicator.trend.simple_moving_average(
+                number_of_candles=self.parameters.smaller_sample,
+                price_source=self.parameters.price_source,
+                indicator_column="smaller_SMA"))
+
+        larger_SMA = (
+            self.data_to_analyze.apply_indicator.trend.simple_moving_average(
+                number_of_candles=self.parameters.larger_sample,
+                price_source=self.parameters.price_source,
+                indicator_column="larger_SMA"))
+
+        if smaller_SMA.last() > larger_SMA.last():
+            side = "long"
+
+        return (self.data_to_analyze[-1:]).assign(suggested_side=side)
