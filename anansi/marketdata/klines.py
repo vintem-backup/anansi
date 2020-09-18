@@ -7,6 +7,8 @@ from .. import settings
 from ..share.tools import ParseDateTime, ConvertTimeFrame
 from ..share.db_handlers import StorageKlines
 
+pd.options.mode.chained_assignment = None
+
 
 @pd.api.extensions.register_dataframe_accessor("ParseTime")
 class ParseTime:
