@@ -2,6 +2,7 @@ import pandas as pd
 from pony.orm import *
 from ..settings import Default, Environments
 from ..share.db_handlers import LogStorage
+from tabulate import tabulate
 
 db, env = Database(), Environments.ENV
 
@@ -88,11 +89,16 @@ class Logger:
         storage = LogStorage(
             table_name="log_operation_id_{}".format(self.operation.id))
 
-        storage.append_dataframe(self.analysis_result)
-
         if env.print_current_round_log:
-            print(self.analysis_result)
-        # return self.analysis_result
+            print(" ")
+            # print(
+            #    tabulate(
+            #        self.analysis_result,
+            #        headers=self.analysis_result.columns))
+            self.analysis_result
+
+        self.analysis_result.ParseTime.from_human_readable_to_timestamp()
+        storage.append_dataframe(self.analysis_result)
 
     def BKP_consolidate_log(self):
         """Cria um só dataframe (linha), com os atributos de interesse durante o
