@@ -95,7 +95,6 @@ class DefaultTrader:
             number_of_candles=Analyzer.n_samples_to_analyze, until=self._now
         )
 
-        #self._hint_side = Analyzer.define_side()
         self.analysis_result = Analyzer.result()
 
     def run(self):
