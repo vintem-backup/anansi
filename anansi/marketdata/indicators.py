@@ -44,15 +44,16 @@ class Price:
     def __init__(self, candles_dataframe):
         self._candles_dataframe = candles_dataframe
 
-    def _given(self, price_source, create_indicator_column=False) -> Indicator:
+    def _given(self, price_source, **kwargs) -> Indicator:
+        indicator_column = kwargs.get("indicator_column")
 
         indicator = Indicator(
             name="price_{}".format(price_source),
             serie=(self._candles_dataframe[_columns[price_source]]).mean(
                 axis=1),
         )
-        if create_indicator_column:
-            self._candles_dataframe.loc[:, indicator.name] = indicator.serie
+        if indicator_column:
+            self._candles_dataframe.loc[:, indicator_column] = indicator.serie
         return indicator
 
 
@@ -66,12 +67,10 @@ class Trend:
 
         self._candles_dataframe = candles_dataframe
 
-    def simple_moving_average(
-        self,
-        number_of_candles: int,
-        price_source="ohlc4",
-        create_indicator_column=False,
-    ) -> Indicator:
+    def simple_moving_average(self, number_of_candles: int,
+                              price_source="ohlc4", **kwargs) -> Indicator:
+
+        indicator_column = kwargs.get("indicator_column")
 
         indicator = Indicator(
             name="sma_{}_{}".format(price_source, str(number_of_candles)),
@@ -79,8 +78,8 @@ class Trend:
             .serie.rolling(window=number_of_candles)
             .mean(),
         )
-        if create_indicator_column:
-            self._candles_dataframe.loc[:, indicator.name] = indicator.serie
+        if indicator_column:
+            self._candles_dataframe.loc[:, indicator_column] = indicator.serie
         return indicator
 
 
