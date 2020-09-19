@@ -22,6 +22,14 @@ class ParseDateTime:
         return pendulum.from_timestamp(self.date_time_in).to_datetime_string()
 
 
+def time_frame_to_seconds(time_frame):
+    conversor_for = {"m": 60, "h": 3600, "d": 86400, "w": 604800}
+    time_unit = time_frame[-1]
+    time_amount = int(time_frame.split(time_unit)[0])
+
+    return time_amount*conversor_for[time_unit]
+
+
 class ConvertTimeFrame:
     seconds_dict = {
         "1m": 60,
@@ -120,3 +128,34 @@ class DocInherit(object):
             raise NameError("Can't find {} in parents".format(self.name))
         func.__doc__ = source.__doc__
         return func
+
+
+class Printers(object):
+    def print_dict(self, entry):
+        max_len = 30
+
+        for item in entry.items():
+            print(
+                "{}{}: {}".format(item[0],
+                                  "".join((max_len - len(item[0]))*["."]),
+                                  item[1]))
+
+    def print_log(self):
+
+        kline = (
+            self.last_analyzed_data.loc[
+                :, self.last_analyzed_data.columns != 'Open_time'])
+
+        print("==============================")
+        print("Open_time: {}".format(
+            self.last_analyzed_data.Open_time.item()))
+        print("==============================")
+
+        print(" ")
+        print(kline.to_string(index=False))
+        print(" ")
+        print("## RESULTS FROM {} ##".format(self.results_from))
+        print(" ")
+        self.print_dict(self.analysis_result)
+        print(" ")
+        print(" ")
