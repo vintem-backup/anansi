@@ -20,23 +20,31 @@ class CrossSMA:
 
     def result(self):
         side = "short"
-        self.data_to_analyze.apply_indicator.price._given(
-            price_source=self.parameters.price_source,
-            indicator_column="price_{}".format(self.parameters.price_source))
+        price = (
+            self.data_to_analyze.apply_indicator.price._given(
+                price_source=self.parameters.price_source))
 
-        smaller_SMA = (
+        SMA_smaller = (
             self.data_to_analyze.apply_indicator.trend.simple_moving_average(
                 number_of_candles=self.parameters.smaller_sample,
-                price_source=self.parameters.price_source,
-                indicator_column="smaller_SMA"))
+                price_source=self.parameters.price_source))
 
-        larger_SMA = (
+        SMA_larger = (
             self.data_to_analyze.apply_indicator.trend.simple_moving_average(
                 number_of_candles=self.parameters.larger_sample,
-                price_source=self.parameters.price_source,
-                indicator_column="larger_SMA"))
+                price_source=self.parameters.price_source))
 
-        if smaller_SMA.last() > larger_SMA.last():
+        if SMA_smaller.last() > SMA_larger.last():
             side = "long"
 
-        return (self.data_to_analyze[-1:]).assign(suggested_side=side)
+        return {
+            "Price ({})".format(self.parameters.price_source): price.last(),
+
+            "SMA_smaller ({} candles)".format(
+                self.parameters.smaller_sample): SMA_smaller.last(),
+
+            "SMA_larger ({} candles)".format(
+                self.parameters.larger_sample): SMA_larger.last(),
+
+            "Hint_side": side,
+        }
