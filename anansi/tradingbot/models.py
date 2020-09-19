@@ -1,6 +1,8 @@
-import pandas as pd
+# import pandas as pd
+import json
 from pony.orm import *
 from ..settings import Default, Environments
+from ..share.tools import Printers
 from ..share.db_handlers import LogStorage
 from tabulate import tabulate
 
@@ -80,44 +82,25 @@ class Operation(db.Entity, AttributeUpdater):
     last_check = Required("LastCheck")
 
 
-class Logger:
+class Logger(Printers):
     def __init__(self, operation):
         self.operation = operation
-        self.analysis_result = None
-
-    def consolidate_log(self):
-        storage = LogStorage(
+        self.storage = LogStorage(
             table_name="log_operation_id_{}".format(self.operation.id))
 
-        if env.print_current_round_log:
-            print(" ")
-            # print(
-            #    tabulate(
-            #        self.analysis_result,
-            #        headers=self.analysis_result.columns))
-            self.analysis_result
+        self.last_analyzed_data = None
+        self.analysis_result = None
+        self.results_from = None
 
-        self.analysis_result.ParseTime.from_human_readable_to_timestamp()
-        storage.append_dataframe(self.analysis_result)
+    def consolidate_log(self):
+        if env.print_log:
+            self.print_log()
 
-    def BKP_consolidate_log(self):
-        """Cria um só dataframe (linha), com os atributos de interesse durante o
-        ciclo + dados - OHLCV - (no caso de back testing).
-        """
+        self.last_analyzed_data.ParseTime.from_human_readable_to_timestamp()
+        log = self.last_analyzed_data.assign(
+            results=json.dumps(self.analysis_result))
 
-        self.log_dataframe = self.analyzed_data.assign(
-            analyzer=self.analyzer,
-            current_side=self.current_side,
-            hint_side=self.hint_side,
-            signal=self.signal,
-            exit_price=self.exit_price,
-            quote=self.quote,
-            base=self.base)
-
-        return self.log_dataframe
-
-    def append_to_db(self):
-        pass
+        self.storage.append_dataframe(log)
 
     def get_from_db(self, number_of_lines):
         pass
