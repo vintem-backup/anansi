@@ -71,7 +71,7 @@ class DefaultTrader:
             self.operation.position.side != side.Zeroed
         ):
 
-            self._step = self.self._stop_loss_time_frame_in_seconds
+            self._step = self._stop_loss_time_frame_in_seconds
             self._stop_analysis()
 
         else:
@@ -85,17 +85,21 @@ class DefaultTrader:
     def _classifier_analysis(self):
         # TODO: Acresentar "trava" de último candle analisado
         self._analyze_for(self.Classifier)
-        self.logger.analysis_result = self.analysis_result
+
+        self.logger.results_from = (
+            "CLASSIFIER ({})".format(self.operation.classifier.name))
+
         self.logger.consolidate_log()
 
     def _analyze_for(self, Analyzer):
         self.KlinesGetter.time_frame = Analyzer.parameters.time_frame
 
-        Analyzer.data_to_analyze = self.KlinesGetter._get_n_until(
-            number_of_candles=Analyzer.n_samples_to_analyze, until=self._now
-        )
+        Analyzer.data_to_analyze = (self.KlinesGetter._get_n_until(
+            number_of_candles=Analyzer.n_samples_to_analyze, until=self._now))
 
-        self.analysis_result = Analyzer.result()
+        self.logger.last_analyzed_data = Analyzer.data_to_analyze[-1:]
+
+        self.logger.analysis_result = self.analysis_result = Analyzer.result()
 
     def run(self):
         self.operation.update(status=stat.Running)
