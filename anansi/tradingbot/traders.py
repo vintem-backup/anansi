@@ -96,9 +96,11 @@ class DefaultTrader:
         self.logger.results_from = (
             "CLASSIFIER ({})".format(self.operation.classifier.name))
 
+        self.operation.last_check.update(by="classifier")
         self.logger.consolidate_log()
 
     def _analyze_for(self, Analyzer):
+        self.operation.last_check.update(at=self._now)
         self.KlinesGetter.time_frame = Analyzer.parameters.time_frame
 
         Analyzer.data_to_analyze = (self.KlinesGetter._get_n_until(
