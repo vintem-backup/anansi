@@ -22,7 +22,7 @@ class ParseDateTime:
         return pendulum.from_timestamp(self.date_time_in).to_datetime_string()
 
 
-def time_frame_to_seconds(time_frame):
+def seconds_in(time_frame: str) -> int:
     conversor_for = {"m": 60, "h": 3600, "d": 86400, "w": 604800}
     time_unit = time_frame[-1]
     time_amount = int(time_frame.split(time_unit)[0])
