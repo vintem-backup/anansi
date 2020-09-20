@@ -74,8 +74,8 @@ class Default:
     status = PossibleStatuses.NotRunning
     mode = PossibleModes.BackTesting
     exchange = "Binance"
-    ticker_symbol = "BTC"
-    quote_symbol = "USDT"
+    quote_asset_symbol = "BTC"
+    base_asset_symbol = "USDT"
     side = PossibleSides.Zeroed
     initial_assets = {
         'BTC': 0.0,
