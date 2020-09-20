@@ -35,9 +35,13 @@ class Signal:
                 return Sig.Buy
 
             if to_side == side.Long:
-                return Sig.DoubleNakedSell
+                return Sig.DoubleBuy
 
 
 class OrderHandler:
     def __init__(self, operation):
         self.operation = operation
+
+    def execute(self, signal):
+        print("Interpreted_signal: ", signal)
+        print(" ")
