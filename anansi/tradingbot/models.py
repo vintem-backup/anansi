@@ -56,8 +56,8 @@ class StopLoss(db.Entity, AttributeUpdater):
 class Market(db.Entity):
     operation = Optional("Operation")
     exchange = Required(str, default=Default.exchange)
-    ticker_symbol = Required(str, default=Default.ticker_symbol)
-    quote_symbol = Required(str, default=Default.quote_symbol)
+    quote_asset_symbol = Required(str, default=Default.quote_asset_symbol)
+    base_asset_symbol = Required(str, default=Default.base_asset_symbol)
 
 
 class LastCheck(db.Entity, AttributeUpdater):
