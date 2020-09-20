@@ -2,7 +2,7 @@ import pendulum
 from .models import Logger
 from . import classifiers, stop_handlers, order_handler
 from ..marketdata import klines
-from ..share.tools import ConvertTimeFrame
+from ..share.tools import seconds_in
 from ..settings import (
     PossibleSides as side,
     PossibleStatuses as stat,
@@ -23,17 +23,15 @@ class DefaultTrader:
             parameters=self.operation.classifier.parameters
         )
 
-        self._classifier_time_frame_in_seconds = ConvertTimeFrame(
-            self.Classifier.parameters.time_frame
-        ).to_seconds()
+        self._classifier_time_frame_in_seconds = seconds_in(
+            self.Classifier.parameters.time_frame)
 
         self.StopLoss = getattr(stop_handlers, self.operation.stop_loss.name)(
             parameters=self.operation.stop_loss.parameters
         )
 
-        self._stop_loss_time_frame_in_seconds = ConvertTimeFrame(
-            self.StopLoss.parameters.time_frame
-        ).to_seconds()
+        self._stop_loss_time_frame_in_seconds = seconds_in(
+            self.StopLoss.parameters.time_frame)
 
         self.KlinesGetter = klines.FromBroker(  # Por hora, evocando da corretora
             broker_name=self.operation.market.exchange,
