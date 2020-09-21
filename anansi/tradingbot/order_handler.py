@@ -1,3 +1,4 @@
+from .models import Trades
 from ..settings import PossibleSides as side, PossibleSignals as Sig
 
 
@@ -41,6 +42,19 @@ class Signal:
 class OrderHandler:
     def __init__(self, operation):
         self.operation = operation
+        self.trades = Trades(operation=self.operation)
+
+    def _save_movement(self):
+        pass
+
+    def _update_position(self):
+        pass
+
+    def _update_wallet(self):
+        pass
+
+    def _order_to_broker(self):
+        pass
 
     def execute(self, signal):
         print("Interpreted_signal: ", signal)
