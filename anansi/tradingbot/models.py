@@ -3,7 +3,7 @@ import json
 from pony.orm import *
 from ..settings import Default, Environments
 from ..share.tools import Printers
-from ..share.db_handlers import LogStorage
+from ..share.db_handlers import Storage
 from tabulate import tabulate
 
 db, env = Database(), Environments.ENV
@@ -85,8 +85,10 @@ class Operation(db.Entity, AttributeUpdater):
 class Logger(Printers):
     def __init__(self, operation):
         self.operation = operation
-        self.storage = LogStorage(
-            table_name="log_operation_id_{}".format(self.operation.id))
+        self.storage = Storage(
+            db_name=env._DbPath,
+            table_name="operation_id_{}_log".format(self.operation.id),
+            primary_key="Open_time")
 
         self.last_analyzed_data = None
         self.analysis_result = None
@@ -109,12 +111,22 @@ class Logger(Printers):
         pass
 
 
-class Movement:
-    signal = None
-    base_asset_amount = None
-    timestamp = None
-    price = None
-    fee = None
+class Trades:
+    def __init__(self, operation):
+        self.operation = operation
+        self.storage = Storage(
+            db_name=env._DbPath,
+            table_name="operation_id_{}_trades".format(self.operation.id),
+            primary_key="timestamp")
+
+        self.timestamp = None
+        self.signal = None
+        self.base_asset_amount = None
+        self.price = None
+        self.fee = None
+
+    def save_trade(self):
+        pass
 
 
 db.generate_mapping(create_tables=True)
