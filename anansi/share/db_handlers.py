@@ -146,8 +146,9 @@ class StorageKlines(SQLite3):
         )
 
 
-class LogStorage(SQLite3):
-    def __init__(self, table_name: str):
-        super(LogStorage, self).__init__(
-            db_name="operations_logs.db", table_name=table_name, primary_key="Open_time"
-        )
+class Storage(SQLite3):
+    def __init__(self, db_name: str, table_name: str, primary_key: str):
+        super(Storage, self).__init__(
+            db_name=db_name,
+            table_name=table_name,
+            primary_key=primary_key)
