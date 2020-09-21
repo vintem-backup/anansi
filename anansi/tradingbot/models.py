@@ -71,6 +71,7 @@ class Operation(db.Entity, AttributeUpdater):
     trader = Required(str, default=Default.trader)
     position = Required("Position", cascade_delete=True)
     market = Required("Market", cascade_delete=True)
+    exposure_factor = Required(float, default=1.3)
     classifier = Required("Classifier", cascade_delete=True)
     stop_loss = Required("StopLoss", cascade_delete=True)
 
@@ -111,7 +112,7 @@ class Logger(Printers):
         pass
 
 
-class Trades:
+class TradesRegister:
     def __init__(self, operation):
         self.operation = operation
         self.storage = Storage(
