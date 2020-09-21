@@ -87,15 +87,20 @@ class DefaultTrader:
         print("Finally stop alalysis! But, nothing here :/")
 
     def _classifier_analysis(self):
-        # TODO: Acresentar "trava" de último candle analisado
-        self._by_stop = False
-        self._analyze_for(self.Classifier)
+        if self._now >= (self.operation.last_check.at
+                         + self._classifier_time_frame_in_seconds):
 
-        self.logger.results_from = (
-            "CLASSIFIER ({})".format(self.operation.classifier.name))
+            self._by_stop = False
+            self._analyze_for(self.Classifier)
 
-        self.operation.last_check.update(by="classifier")
-        self.logger.consolidate_log()
+            self.logger.results_from = (
+                "CLASSIFIER ({})".format(self.operation.classifier.name))
+
+            self.operation.last_check.update(by="classifier")
+            self.logger.consolidate_log()
+
+        else:
+            print("Passing classifier analysis, cause there is no new candle.")
 
     def _analyze_for(self, Analyzer):
         self.operation.last_check.update(at=self._now)
