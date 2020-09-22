@@ -105,7 +105,7 @@ class Binance_:
     _request_weight_per_minute = 1100  # Default: 1200/min/IP
     records_per_request = 500  # Default: 500 | Limit: 1000 samples/response
     minimal_time_frame = "1m"
-
+    fee_rate_decimal = 0.001
     kline_informations = [
         # Que informações (em ordem) são retornadas pela Binance em cada candle
         "Open_time",
