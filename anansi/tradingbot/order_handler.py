@@ -6,6 +6,8 @@ from ..settings import (
     PossibleSignals as sig,
 )
 
+from ..marketdata import klines
+
 
 class Signal:
 
@@ -46,61 +48,90 @@ class Signal:
 
 class OrderHandler:
     def __init__(self, operation):
+        self._now = None
         self.operation = operation
         self.trades = TradesRegister(operation=self.operation)
-        wallet = Wallet(user=self.operation.user)
+        self.wallet = operation.user.wallet.assets
         self.signal = None
-        self.amount = None
-        executor = "_{}_executor".format(self.operation.mode)
-        self._execute = getattr(self, executor)
+        self.quote_asset_amount = None
+        self.price = None
         self.broker = getattr(trade_brokers, self.operation.market.exchange)(
             ticker_symbol=(
                 self.operation.market.quote_asset_symbol
                 + self.operation.market.base_asset_symbol))
 
     def _price(self):
-        pass
+        raise NotImplementedError
 
     def _amount(self):
-        factor = self.operation.exposure_factor
+        exposure_factor = self.operation.exposure_factor
+        raw_quote_asset_amount = 0.0
 
-        amount = factor*100.0
+        if self.signal == sig.Buy:
+            try:
+                avaliable_in_wallet = self.wallet[
+                    self.operation.market.base_asset_symbol]
 
-        self.amount = amount
+                raw_quote_asset_amount = (
+                    exposure_factor*(avaliable_in_wallet/self._price()))
+            except Exception as e:
+                pass
 
-        return amount
+        if self.signal == sig.Sell:
+            try:
+                avaliable_in_wallet = self.wallet[
+                    self.operation.market.quote_asset_symbol]
 
-    def _save_movement(self):
-        pass
+                raw_quote_asset_amount = exposure_factor*(avaliable_in_wallet)
+            except Exception as e:
+                pass
 
-    def _update_position(self):
-        pass
+        integer_factor = int(
+            raw_quote_asset_amount/self.broker.mininal_amount())
 
-    def _update_wallet(self):
-        pass
-
-    def _RealTrading_executor(self):
-        pass
-
-    def _RealTimeTest_executor(self):
-        pass
-
-    def _BackTesting_executor(self):
-
-        print("Interpreted_signal: ", self.signal)
-        print(" ")
+        self.quote_asset_amount = integer_factor*self.broker.mininal_amount()
+        return self.quote_asset_amount
 
     def execute(self, signal):
-        self.signal = signal
+        if signal != sig.Hold:
+            self.signal = signal
 
-        if self._amount() > self.broker.mininal_amount():
-            self._execute()
+            if self._amount() > self.broker.mininal_amount():
+                self._execute()
 
-            print("Executed because {} > {}".format(
-                self.amount, self.broker.mininal_amount()))
-            print(" ")
+                print("Executed because {} > {}".format(
+                    self.quote_asset_amount, self.broker.mininal_amount()))
+                print(" ")
+
+            else:
+                print("Fail because {} < {}".format(
+                    self.quote_asset_amount, self.broker.mininal_amount()))
+                print(" ")
 
         else:
-            print("Fail because {} < {}".format(
-                self.amount, self.broker.mininal_amount()))
-            print(" ")
+            print("Passing, signal = 'Hold'")
+
+
+class BackTestingOrder(OrderHandler):
+    def __init__(self, operation):
+        self.KlinesGetter = klines.FromBroker(  # Por hora, evocando da corretora
+            broker_name=operation.market.exchange,
+            symbol=(
+                operation.market.quote_asset_symbol
+                + operation.market.base_asset_symbol))
+        super(BackTestingOrder, self).__init__(operation)
+
+    def _price(self):
+        self.KlinesGetter.time_frame = "1m"
+        last_kline = (self.KlinesGetter._get_n_until(
+            number_of_candles=1, until=self._now))
+
+        price = last_kline.apply_indicator.price._given(
+            price_source="ohlc4")
+
+        self.price = price.last()
+        return self.price
+
+    def _execute(self):
+        print("Interpreted_signal: {}, price: {}".format(self.signal, self.price))
+        print(" ")
