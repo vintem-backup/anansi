@@ -3,4 +3,4 @@ class Binance(object):
         self.ticker_symbol = ticker_symbol
 
     def mininal_amount(self):
-        return 500.0
+        return 0.000001  # ! JUST A MOCK: Válido apenas paras os testes BTCUSDT
