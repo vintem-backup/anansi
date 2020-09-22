@@ -43,14 +43,17 @@ class DefaultTrader:
             ),
         )
 
+        self.OrderHandler = getattr(order_handler,
+                                    "{}Order".format(self.operation.mode))(
+            operation=self.operation)
+
         self._now = (
             self._initial_now_for_backtesting()
             if self.operation.mode == mode.BackTesting
             else pendulum.now().int_timestamp
         )
 
-        self.OrderHandler = order_handler.OrderHandler(
-            operation=self.operation)
+        self.OrderHandler._now = self._now
 
     def _initial_now_for_backtesting(self):
         self.KlinesGetter.time_frame = self.Classifier.parameters.time_frame
@@ -63,6 +66,8 @@ class DefaultTrader:
     def _get_ready_to_repeat(self):
         if self.operation.mode == mode.BackTesting:
             self._now += self._step
+            self.OrderHandler._now = self._now
+
             #! When the backtesting klines start to be produced
             #! synthetically from the database, this parameter must be the
             #! Open_time of the last available candle.
