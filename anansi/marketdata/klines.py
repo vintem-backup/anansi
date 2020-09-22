@@ -143,14 +143,6 @@ class FromBroker:
 
         return klines
 
-    def _get(self) -> pd.DataFrame:
-        _klines = self._get_raw_()
-        if self._ForceTimestampFormat:
-            return _klines
-
-        _klines.ParseTime.from_timestamp_to_human_readable()
-        return _klines
-
     def _until_given(self, since, number_of_candles):
         until = (number_of_candles + 1) * self.SecondsTimeFrame() + since
         self._until = (until if until <= self._now() else self._now())
@@ -163,18 +155,30 @@ class FromBroker:
     def _get_n_until(self, number_of_candles: int, until: int):
         self._until = until
         self._since_given(self._until, number_of_candles)
-        return self._get()[-number_of_candles:]
+        _klines = self._get_raw_()
+        sliced_klines = (_klines[_klines.Open_time <=
+                                 self._until][-number_of_candles:])
+
+        sliced_klines.ParseTime.from_timestamp_to_human_readable()
+        return sliced_klines
 
     def _get_n_since(self, number_of_candles: int, since: int):
         self._since = since
         self._until_given(self._since, number_of_candles)
-        return self._get()[:number_of_candles]
+
+        _klines = self._get_raw_()
+        sliced_klines = (_klines[_klines.Open_time >=
+                                 self._since][:number_of_candles])
+
+        sliced_klines.ParseTime.from_timestamp_to_human_readable()
+        return sliced_klines
 
     def _get_given_since_and_until(self, since: str, until: str) -> pd.DataFrame:
         self._since = ParseDateTime(since).from_human_readable_to_timestamp()
         self._until = ParseDateTime(until).from_human_readable_to_timestamp()
-
-        return self._get()[:-1]
+        _klines = self._get_raw_()[:-1]
+        _klines.ParseTime.from_timestamp_to_human_readable()
+        return _klines
 
     def _raw_back_testing(self):
         self._since = self._oldest_open_time()
