@@ -124,7 +124,7 @@ class TradesRegister:
         self.signal = None
         self.base_asset_amount = None
         self.price = None
-        self.fee = None
+        self.fee = None  # base_asset units
 
     def save_trade(self):
         pass
