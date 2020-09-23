@@ -25,10 +25,10 @@ class User(db.Entity, AttributeUpdater):
     login_displayed_name = Optional(str)
     email = Optional(str)
     operations = Set("Operation", cascade_delete=True)
-    wallet = Required("Wallet", cascade_delete=True)
+    portfolio = Required("Portfolio", cascade_delete=True)
 
 
-class Wallet(db.Entity, AttributeUpdater):
+class Portfolio(db.Entity, AttributeUpdater):
     user = Optional("User")
     assets = Optional(Json)
 
@@ -62,8 +62,8 @@ class Market(db.Entity):
 
 class LastCheck(db.Entity, AttributeUpdater):
     Operation = Optional("Operation")
-    by = Optional(str)  # Classifier or StopLoss name
-    at = Optional(int)  # timestamp
+    by_classifier_at = Optional(int)  # timestamp
+    by_stop_loss_at = Optional(int)  # timestamp
 
 
 class Operation(db.Entity, AttributeUpdater):
