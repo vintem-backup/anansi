@@ -20,8 +20,8 @@ def DefaultStopLossParameters():
 
 @db_session
 def create_user(**kwargs):
-    wallet = Wallet(assets=Default.initial_assets)
-    User(**kwargs, wallet=wallet)
+    portfolio = Portfolio(assets=Default.initial_assets)
+    User(**kwargs, portfolio=portfolio)
 
 
 @db_session
