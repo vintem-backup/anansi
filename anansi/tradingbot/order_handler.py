@@ -1,12 +1,12 @@
 from . import trade_brokers
-from .models import Wallet, TradesRegister
+from .models import Portfolio, TradesRegister
 from ..settings import (
     PossibleSides as side,
     PossibleModes as mode,
     PossibleSignals as sig,
 )
 
-from ..marketdata import klines
+from ..marketdata.handlers import PriceGetter
 
 
 class Signal:
@@ -51,7 +51,7 @@ class OrderHandler:
         self._now = None
         self.operation = operation
         self.trades = TradesRegister(operation=self.operation)
-        self.wallet = operation.user.wallet.assets
+        self.portfolio = operation.user.portfolio.assets
         self.signal = None
         self.quote_asset_amount = None
         self.price = None
@@ -60,31 +60,35 @@ class OrderHandler:
                 self.operation.market.quote_asset_symbol
                 + self.operation.market.base_asset_symbol))
 
+        self.Pricing = PriceGetter(
+            broker_name=operation.market.exchange,
+            ticker_symbol=(
+                operation.market.quote_asset_symbol
+                + operation.market.base_asset_symbol))
+
     def _price(self):
         raise NotImplementedError
 
+    def _avaliable(self, _class: str):
+        asset = getattr(
+            self.operation.market, "{}_asset_symbol".format(_class))
+
+        try:
+            return self.portfolio[asset]
+
+        except Exception as e:
+            print("Fail get_in_portfolio due", e)
+            return 0.0
+
     def _amount(self):
         exposure_factor = self.operation.exposure_factor
-        raw_quote_asset_amount = 0.0
 
-        if self.signal == sig.Buy:
-            try:
-                avaliable_in_wallet = self.wallet[
-                    self.operation.market.base_asset_symbol]
-
-                raw_quote_asset_amount = (
-                    exposure_factor*(avaliable_in_wallet/self._price()))
-            except Exception as e:
-                pass
-
-        if self.signal == sig.Sell:
-            try:
-                avaliable_in_wallet = self.wallet[
-                    self.operation.market.quote_asset_symbol]
-
-                raw_quote_asset_amount = exposure_factor*(avaliable_in_wallet)
-            except Exception as e:
-                pass
+        raw_quote_asset_amount = (
+            (self._avaliable("base")/self._price()) * exposure_factor
+            if self.signal == sig.Buy
+            else self._avaliable("quote") * exposure_factor
+            if self.signal == sig.Sell
+            else 0.0)
 
         integer_factor = int(
             raw_quote_asset_amount/self.broker.mininal_amount())
@@ -114,22 +118,11 @@ class OrderHandler:
 
 class BackTestingOrder(OrderHandler):
     def __init__(self, operation):
-        self.KlinesGetter = klines.FromBroker(  # Por hora, evocando da corretora
-            broker_name=operation.market.exchange,
-            symbol=(
-                operation.market.quote_asset_symbol
-                + operation.market.base_asset_symbol))
+
         super(BackTestingOrder, self).__init__(operation)
 
     def _price(self):
-        self.KlinesGetter.time_frame = "1m"
-        last_kline = (self.KlinesGetter._get_n_until(
-            number_of_candles=1, until=self._now))
-
-        price = last_kline.apply_indicator.price._given(
-            price_source="ohlc4")
-
-        self.price = price.last()
+        self.price = self.Pricing.for_back_testing(at=self._now)
         return self.price
 
     def _execute(self):
