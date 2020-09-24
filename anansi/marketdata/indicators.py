@@ -1,9 +1,9 @@
-"""Todos os indicadores de mercado são reunidos aqui, estendendo a classe
-pandas.Dataframe
+""" All market indicators are coded here, extending the pandas.Dataframe
+object, using default pandas API on 'handlers' module.
 
-Indicadores baseados em um preço, devem informar o 'price_source' desejado 
-que, por padrão, é 'ohlc4'. Abaixo, os valores possíveis para o este parâmetro,
-bem como a operação associada às colunas do dataframe de candles.
+Indicators based on assets prices, must inform the desired 'metrics'
+which, by default, is 'ohlc4'. Below, the possible values ​​for this
+parameter, as well as the associated calculation.
 
 "o"     = "Open"
 "h"     = "High"
@@ -38,64 +38,60 @@ class Indicator(object):
         return self.serie.tail(1).item()
 
 
-class Price:
-    __slots__ = ["_candles_dataframe"]
+@pd.api.extensions.register_dataframe_accessor("PriceFromKline")
+class PriceFromKline:
+    __slots__ = ["_klines"]
 
-    def __init__(self, candles_dataframe):
-        self._candles_dataframe = candles_dataframe
+    def __init__(self, klines: pd.DataFrame):
+        self._klines = klines
 
-    def _given(self, price_source, **kwargs) -> Indicator:
+    def using(self, metrics: str, **kwargs) -> Indicator:
         indicator_column = kwargs.get("indicator_column")
 
         indicator = Indicator(
-            name="price_{}".format(price_source),
-            serie=(self._candles_dataframe[_columns[price_source]]).mean(
-                axis=1),
-        )
+            name="price_{}".format(metrics),
+            serie=(self._klines[_columns[metrics]]).mean(
+                axis=1))
+
         if indicator_column:
-            self._candles_dataframe.loc[:, indicator_column] = indicator.serie
+            self._klines.loc[:, indicator_column] = indicator.serie
         return indicator
 
 
 class Trend:
-    """Indicadores de tendência
-    """
+    __slots__ = ["_klines"]
 
-    __slots__ = ["_candles_dataframe"]
-
-    def __init__(self, candles_dataframe):
-
-        self._candles_dataframe = candles_dataframe
+    def __init__(self, klines):
+        self._klines = klines
 
     def simple_moving_average(self, number_of_candles: int,
-                              price_source="ohlc4", **kwargs) -> Indicator:
+                              metrics="ohlc4", **kwargs) -> Indicator:
 
         indicator_column = kwargs.get("indicator_column")
 
         indicator = Indicator(
-            name="sma_{}_{}".format(price_source, str(number_of_candles)),
-            serie=(self._candles_dataframe.apply_indicator.price._given(price_source))
-            .serie.rolling(window=number_of_candles)
-            .mean(),
-        )
+            name="sma_{}_{}".format(metrics, str(number_of_candles)),
+            serie=(self._klines.PriceFromKline.using(metrics))
+            .serie.rolling(window=number_of_candles).mean())
+
         if indicator_column:
-            self._candles_dataframe.loc[:, indicator_column] = indicator.serie
+            self._klines.loc[:, indicator_column] = indicator.serie
         return indicator
 
 
 class Momentum:
-    def __init__(self, candles_dataframe):
+    def __init__(self, klines):
 
-        self._candles_dataframe = candles_dataframe
+        self._klines = klines
 
 
 class Volatility:
-    def __init__(self, candles_dataframe):
+    def __init__(self, klines):
 
-        self._candles_dataframe = candles_dataframe
+        self._klines = klines
 
 
 class Volume:
-    def __init__(self, candles_dataframe):
+    def __init__(self, klines):
 
-        self._candles_dataframe = candles_dataframe
+        self._klines = klines
