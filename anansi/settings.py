@@ -52,11 +52,11 @@ class PossibleSides:
     Zeroed = "Zeroed"
     Long = "Long"
     Short = "Short"
-    Classifying = "Classifying"
+    Classifying = "Classifying"  # ! Is really needed?
 
 
 class PossibleSignals:
-    StopPassed = "StopPassed"
+    StopPassed = "StopPassed"  # ! Is really needed?
     Hold = "Hold"
     Buy = "Buy"
     Sell = "Sell"
@@ -107,7 +107,8 @@ class Binance_:
     minimal_time_frame = "1m"
     fee_rate_decimal = 0.001
     kline_informations = [
-        # Que informações (em ordem) são retornadas pela Binance em cada candle
+        # Which information (in order), about each candle,
+        # is returned by Binance
         "Open_time",
         "Open",
         "High",
