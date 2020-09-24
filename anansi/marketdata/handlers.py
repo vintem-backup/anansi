@@ -1,17 +1,17 @@
 import time
 import pandas as pd
 import pendulum
-from . import (data_brokers as brokers,
-               indicators)
-from .. import settings
-from ..share.tools import ParseDateTime, ConvertTimeFrame
+from . import data_brokers as brokers
+from .indicators import *
+#from .. import settings
+from ..share.tools import ParseDateTime, seconds_in
 from ..share.db_handlers import StorageKlines
 
 pd.options.mode.chained_assignment = None
 
 
-@pd.api.extensions.register_dataframe_accessor("ParseTime")
-class ParseTime:
+@pd.api.extensions.register_dataframe_accessor("KlinesDateTime")
+class KlinesDateTime:
     def __init__(self, klines: pd.DataFrame):
         self._klines = klines
 
@@ -52,39 +52,48 @@ class ParseTime:
 class ApplyIndicator:
     def __init__(self, klines):
         self._klines = klines
-        self.price = indicators.Price(self._klines)
-        self.trend = indicators.Trend(self._klines)
-        self.momentum = indicators.Momentum(self._klines)
-        self.volatility = indicators.Volatility(self._klines)
-        self.volume = indicators.Volume(self._klines)
+        self.trend = Trend(self._klines)
+        self.momentum = Momentum(self._klines)
+        self.volatility = Volatility(self._klines)
+        self.volume = Volume(self._klines)
+
+# @pd.api.extensions.register_dataframe_accessor("PriceFromKline")
+# class PriceFromKline:
+#    def __init__(self, klines):
+#        self._klines = klines
+#        self.price = indicators.PriceFromKline(self._klines)
 
 
 class KlinesFromBroker:
     """ Aims to serve as a queue for requesting klines (OHLC) through brokers
     endpoints, spliting the requests, in order to respect broker established
-    limits. 
+    limits.
     If a request limit is close to being reached, will pause the queue,
-    until cooldown time pass. 
-    Returns sanitized klines to the client,
-    formatted as pandas DataFrame.
+    until cooldown time pass.
+    Returns sanitized klines to the client, formatted as pandas DataFrame.
     """
 
     __slots__ = [
         "broker_name",
-        "_broker",
         "ticker_symbol",
+        "_broker",
         "_time_frame",
-        "_ForceTimestampFormat",
         "_since",
         "_until",
     ]
 
-    def __init__(self, broker_name: str, ticker_symbol: str, time_frame: str = None):
+    def __init__(self,
+                 broker_name: str,
+                 ticker_symbol: str,
+                 time_frame: str = None):
+
         self.broker_name = broker_name.lower()
-        self._broker = getattr(
-            brokers, brokers.wrapper_for(self.broker_name))()
         self.ticker_symbol = ticker_symbol.upper()
-        self._time_frame = time_frame
+        self._broker = getattr(
+            brokers, "{}DataBroker".format(broker_name.capitalize()))()
+
+        self._time_frame = (time_frame if time_frame
+                            else self._broker.mininal_time_frame)
         self._since = 1
         self._until = 2
 
@@ -100,7 +109,7 @@ class KlinesFromBroker:
         return (pendulum.now(tz="UTC")).int_timestamp
 
     def SecondsTimeFrame(self):
-        return ConvertTimeFrame(self._time_frame).to_seconds()
+        return seconds_in(self._time_frame)
 
     def _oldest_open_time(self) -> int:
         return (
@@ -121,7 +130,7 @@ class KlinesFromBroker:
         Storage, klines = StorageKlines(table_name), pd.DataFrame()
 
         for timestamp in range(self._since,
-                               self._until + 1,
+                               self._until + 1,  # 1 sec after '_until'
                                self._request_step()):
             while True:
                 try:
@@ -133,74 +142,90 @@ class KlinesFromBroker:
                     klines = klines.append(raw_klines, ignore_index=True)
                     break
 
-                except Exception as e:
+                except Exception as e:  # Usually connection issues.
                     # TODO: To logger instead print
                     print("Fail, due the error: ", e)
-                    time.sleep(60)
+                    time.sleep(60)  # 60 sec cooldown time.
 
             if self._broker.was_request_limit_reached():
-                time.sleep(10)
+                time.sleep(10)  # 10 sec cooldown time.
                 # TODO: To logger instead print
                 print("Sleeping cause request limit was hit.")
 
         return klines
 
-    def _until_given(self, since, number_of_candles):
+    # TODO: Sanitize since/until to avoid ValueError until < since
+    def _until_given_since_n(self, since, number_of_candles):
         until = (number_of_candles + 1) * self.SecondsTimeFrame() + since
         self._until = (until if until <= self._now() else self._now())
 
-    def _since_given(self, until, number_of_candles):
+    def _since_given_until_n(self, until, number_of_candles):
         since = until - (number_of_candles + 1) * self.SecondsTimeFrame()
         self._since = (since if since >= self._oldest_open_time()
                        else self._oldest_open_time())
 
     def _get_n_until(self, number_of_candles: int, until: int):
         self._until = until
-        self._since_given(self._until, number_of_candles)
+        self._since_given_until_n(self._until, number_of_candles)
         _klines = self._get_raw_()
-        sliced_klines = (_klines[_klines.Open_time <=
-                                 self._until][-number_of_candles:])
-
-        sliced_klines.ParseTime.from_timestamp_to_human_readable()
-        return sliced_klines
+        return _klines[_klines.Open_time <= self._until][-number_of_candles:]
 
     def _get_n_since(self, number_of_candles: int, since: int):
         self._since = since
-        self._until_given(self._since, number_of_candles)
+        self._until_given_since_n(self._since, number_of_candles)
         _klines = self._get_raw_()
         return _klines[_klines.Open_time >= self._since][:number_of_candles]
 
-        # sliced_klines = (_klines[_klines.Open_time >=
-        #                         self._since][:number_of_candles])
-
-        # sliced_klines.ParseTime.from_timestamp_to_human_readable()
-        # return sliced_klines
-
-    def _get_given_since_and_until(self, since: str, until: str) -> pd.DataFrame:
-        self._since = ParseDateTime(since).from_human_readable_to_timestamp()
-        self._until = ParseDateTime(until).from_human_readable_to_timestamp()
+    def _get_given_since_and_until(self, since: int, until: int) -> pd.DataFrame:
+        self._since, self._until = since, until
         return self._get_raw_()[:-1]
-
-        #_klines = self._get_raw_()[:-1]
-        # _klines.ParseTime.from_timestamp_to_human_readable()
-        # return _klines
 
     def _raw_back_testing(self):
         self._since = self._oldest_open_time()
         self._until = self._now()
 
-        # self._Storage.drop_table()
         self._get_raw_(appending_raw_to_db=True)
 
-    def get(self):
-        pass
+    def _sanitize_input_dt(self, datetime) -> int:
+        try:
+            return int(datetime)  # Already int or str timestamp
+        except:  # Human readable datetime ("YYYY-MM-DD HH:mm:ss")
+            try:
+                return (
+                    ParseDateTime(
+                        datetime).from_human_readable_to_timestamp())
+            except:
+                return 0  # indicative of error
+
+    def get(self, **kwargs) -> pd.DataFrame:
+        since = kwargs.get("since")
+        until = kwargs.get("until")
+        number_of_candles: int = kwargs.get("number_of_candles")
+
+        if since:
+            since = self._sanitize_input_dt(since)
+        if until:
+            until = self._sanitize_input_dt(until)
+
+        klines = (
+            self._get_given_since_and_until(since, until)
+            if since and until and not number_of_candles
+            else self._get_n_since(number_of_candles, since)
+            if number_of_candles and since and not until
+            else self._get_n_until(number_of_candles, until)
+            if number_of_candles and until and not since
+            else pd.DataFrame())  # Errors imply an empty dataframe
+
+        klines.KlinesDateTime.from_timestamp_to_human_readable()
+        return klines
 
     def oldest(self, number_of_candles=1) -> pd.DataFrame:
-        return self._get_n_since(
-            number_of_candles, since=self._oldest_open_time())
+        return self.get(number_of_candles=number_of_candles,
+                        since=self._oldest_open_time())
 
     def newest(self, number_of_candles=1) -> pd.DataFrame:
-        return self._get_n_until(number_of_candles, until=self._now())
+        return self.get(number_of_candles=number_of_candles,
+                        until=self._now())
 
 
 class BackTestingKlines(KlinesFromBroker):
@@ -212,10 +237,14 @@ class PriceGetter:
     def __init__(self, broker_name: str, ticker_symbol: str):
         self.broker_name = broker_name
         self.ticker_symbol = ticker_symbol
-        self.KlinesGetter = KlinesFromBroker(broker_name, ticker_symbol)
 
-    def for_back_testing(self, at: int) -> float:
-        self.KlinesGetter.time_frame = "1m"
-        last_kline = KlinesGetter._get_n_until(number_of_candles=1, until=at)
-        price = last_kline.apply_indicator.price._given(price_source="ohlc4")
+
+class BackTestingPriceGetter:
+    def __init__(self, broker_name: str, ticker_symbol: str):
+        self.klines = BackTestingKlines(broker_name, ticker_symbol)
+        super(BackTestingPriceGetter, self).__init__()
+
+    def get(self, at: int) -> float:
+        last_kline = klines.get(number_of_candles=1, until=at)
+        price = last_kline.PriceFromKline.using(metrics="ohlc4")
         return price.last()
