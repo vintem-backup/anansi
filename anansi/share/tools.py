@@ -6,6 +6,8 @@ from collections import namedtuple
 from functools import wraps, partial
 from time import time
 import pendulum
+import pandas as pd
+#! Translate docstrings and delete useless commented blocks
 
 
 class ParseDateTime:
@@ -28,29 +30,6 @@ def seconds_in(time_frame: str) -> int:
     time_amount = int(time_frame.split(time_unit)[0])
 
     return time_amount*conversor_for[time_unit]
-
-
-class ConvertTimeFrame:
-    seconds_dict = {
-        "1m": 60,
-        "3m": 180,
-        "5m": 300,
-        "15m": 900,
-        "30m": 1800,
-        "1h": 3600,
-        "2h": 7200,
-        "4h": 14400,
-        "6h": 21600,
-        "12h": 43200,
-        "1d": 86400,
-        "1w": 604800,
-    }
-
-    def __init__(self, time_frame):
-        self.time_frame = time_frame
-
-    def to_seconds(self):
-        return self.seconds_dict[self.time_frame]
 
 
 class Deserialize:
@@ -128,6 +107,67 @@ class DocInherit(object):
             raise NameError("Can't find {} in parents".format(self.name))
         func.__doc__ = source.__doc__
         return func
+
+
+class FormatKlines:
+    __slots__ = [
+        "time_frame",
+        "DateTimeFmt",
+        "DateTimeUnit",
+        "columns",
+        "formatted_klines",
+    ]
+
+    def __init__(
+        self, time_frame,
+        klines: list,
+        DateTimeFmt: str,
+        DateTimeUnit: str,
+        columns: list
+    ):
+
+        self.time_frame = time_frame
+        self.DateTimeFmt = DateTimeFmt
+        self.DateTimeUnit = DateTimeUnit
+        self.columns = columns
+        self.formatted_klines = [self.format_each(kline) for kline in klines]
+
+    def format_datetime(self, datetime_in, truncate_seconds_to_zero=False) -> int:
+        if self.DateTimeFmt == "timestamp":
+            if self.DateTimeUnit == "seconds":
+                datetime_out = int(float(datetime_in))
+            elif self.DateTimeUnit == "milliseconds":
+                datetime_out = int(float(datetime_in) / 1000)
+
+            if truncate_seconds_to_zero:
+                _date_time = pendulum.from_timestamp(int(datetime_out))
+                if _date_time.second != 0:
+                    datetime_out = (
+                        _date_time.subtract(seconds=_date_time.second)
+                    ).int_timestamp
+
+        return datetime_out
+
+    def format_each(self, kline: list) -> list:
+
+        return [
+            self.format_datetime(_item, truncate_seconds_to_zero=True)
+            if kline.index(_item) == self.columns.index("Open_time")
+            else self.format_datetime(_item)
+            if kline.index(_item) == self.columns.index("Close_time")
+            else float(_item)
+            for _item in kline
+        ]
+
+    def to_dataframe(self) -> pd.DataFrame:
+        klines = pd.DataFrame(
+            self.formatted_klines,
+            columns=self.columns
+        ).astype({"Open_time": "int32", "Close_time": "int32"})
+
+        klines.attrs.update(
+            {"SecondsTimeFrame": seconds_in(self.time_frame)})
+        return klines
 
 
 class Printers(object):
