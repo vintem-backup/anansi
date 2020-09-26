@@ -93,7 +93,7 @@ class KlinesFromBroker:
             brokers, "{}DataBroker".format(broker_name.capitalize()))()
 
         self._time_frame = (time_frame if time_frame
-                            else self._broker.mininal_time_frame)
+                            else "1m")  # self._broker.mininal_time_frame)
         self._since = 1
         self._until = 2
 
@@ -118,6 +118,9 @@ class KlinesFromBroker:
                 time_frame=self._time_frame,
                 since=1,
                 number_of_candles=1).Open_time.item())
+
+    def _newest_open_time(self):
+        return self._now()
 
     def _request_step(self) -> int:
         return self._broker.records_per_request * self.SecondsTimeFrame()
@@ -178,7 +181,8 @@ class KlinesFromBroker:
 
     def _get_given_since_and_until(self, since: int, until: int) -> pd.DataFrame:
         self._since, self._until = since, until
-        return self._get_raw_()[:-1]
+        _klines = self._get_raw_()
+        return _klines[_klines.Open_time <= self._until]
 
     def _raw_back_testing(self):
         self._since = self._oldest_open_time()
@@ -228,9 +232,14 @@ class KlinesFromBroker:
                         until=self._now())
 
 
-class BackTestingKlines(KlinesFromBroker):
-    def __init__(self, broker_name: str, ticker_symbol: str, time_frame: str = None):
-        super(BackTestingKlines, self).__init__()
+class BackTestingKlines(KlinesFromBroker):  # just mocking for while
+    def __init__(self,
+                 broker_name: str,
+                 ticker_symbol: str,
+                 time_frame=None):
+
+        super(BackTestingKlines, self).__init__(
+            broker_name, ticker_symbol, time_frame)
 
 
 class PriceGetter:
@@ -238,13 +247,24 @@ class PriceGetter:
         self.broker_name = broker_name
         self.ticker_symbol = ticker_symbol
 
+    def get(self, **kwargs):
+        raise NotImplementedError
 
-class BackTestingPriceGetter:
+
+class RealTradingPriceGetter(PriceGetter):
+    pass
+
+
+class RealTimeTestPriceGetter(PriceGetter):
+    pass
+
+
+class BackTestingPriceGetter:  # (PriceGetter):
     def __init__(self, broker_name: str, ticker_symbol: str):
         self.klines = BackTestingKlines(broker_name, ticker_symbol)
-        super(BackTestingPriceGetter, self).__init__()
+        #super(BackTestingPriceGetter, self).__init__()
 
     def get(self, at: int) -> float:
-        last_kline = klines.get(number_of_candles=1, until=at)
+        last_kline = self.klines.get(number_of_candles=1, until=at)
         price = last_kline.PriceFromKline.using(metrics="ohlc4")
         return price.last()
