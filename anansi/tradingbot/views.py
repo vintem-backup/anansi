@@ -31,7 +31,7 @@ def create_default_operation(user):
         user=user,
         market=Market(),
         position=Position(),
-        last_check=LastCheck(at=0),
+        last_check=LastCheck(by_classifier_at=0),
         classifier=Classifier(
             name=Default.classifier, parameters=DefaultClassifierParameters()
         ),
