@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+from ..settings import PossibleSides as Side, PossibleSignals as sig
 import json
 from collections import namedtuple
 from functools import wraps, partial
 from time import time
 import pendulum
 import pandas as pd
-#! Translate docstrings and delete useless commented blocks
 
 
 class ParseDateTime:
@@ -132,19 +132,24 @@ class FormatKlines:
         self.columns = columns
         self.formatted_klines = [self.format_each(kline) for kline in klines]
 
-    def format_datetime(self, datetime_in, truncate_seconds_to_zero=False) -> int:
+    def format_datetime(self,
+                        datetime_in,
+                        truncate_seconds_to_zero=False) -> int:
+
         if self.DateTimeFmt == "timestamp":
             if self.DateTimeUnit == "seconds":
                 datetime_out = int(float(datetime_in))
+
             elif self.DateTimeUnit == "milliseconds":
                 datetime_out = int(float(datetime_in) / 1000)
 
             if truncate_seconds_to_zero:
                 _date_time = pendulum.from_timestamp(int(datetime_out))
+
                 if _date_time.second != 0:
                     datetime_out = (
-                        _date_time.subtract(seconds=_date_time.second)
-                    ).int_timestamp
+                        _date_time.subtract(
+                            seconds=_date_time.second)).int_timestamp
 
         return datetime_out
 
@@ -170,8 +175,55 @@ class FormatKlines:
         return klines
 
 
-class Printers(object):
-    def print_dict(self, entry):
+class Signal:
+
+    def __init__(self, from_side: str, to_side: str, by_stop=False):
+        self.from_side = from_side.capitalize()
+        self.to_side = to_side.capitalize()
+        self.by_stop = by_stop
+
+    def get(self):
+        if self.from_side == self.to_side:
+            return sig.Hold
+
+        if self.from_side == Side.Zeroed:
+            if self.to_side == Side.Long:
+                return sig.Buy
+
+            if self.to_side == Side.Short:
+                return sig.NakedSell
+
+        if self.from_side == Side.Long:
+            if self.to_side == Side.Zeroed:
+                if self.by_stop:
+                    return sig.StoppedFromLong
+                return sig.Sell
+
+            if to_side == Side.Short:
+                return sig.DoubleNakedSell
+
+        if self.from_side == Side.Short:
+            if to_side == Side.Zeroed:
+                if self.by_stop:
+                    return sig.StoppedFromShort
+                return sig.Buy
+
+            if to_side == Side.Long:
+                return sig.DoubleBuy
+
+
+def get_signal(from_side, to_side, by_stop):
+    return Signal(from_side, to_side, by_stop).get()
+
+
+class Result:
+    def __init__(self, which_side: str, by_stop=False):
+        self.side = which_side
+        self.by_stop = by_stop
+
+
+class PrintLog(object):
+    def _print_dict(self, entry):
         max_len = 30
 
         for item in entry.items():
@@ -181,7 +233,6 @@ class Printers(object):
                                   item[1]))
 
     def print_log(self):
-
         kline = (
             self.last_analyzed_data.loc[
                 :, self.last_analyzed_data.columns != 'Open_time'])
@@ -194,8 +245,8 @@ class Printers(object):
         print(" ")
         print(kline.to_string(index=False))
         print(" ")
-        print("## RESULTS FROM {} ##".format(self.results_from))
+        print("## Analyzed_by: {} ##".format(self.analyzed_by))
         print(" ")
-        self.print_dict(self.analysis_result)
+        self._print_dict(self.analysis_result)
         print(" ")
         print(" ")
