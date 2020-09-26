@@ -1,53 +1,11 @@
 from . import trade_brokers
 from .models import Portfolio, TradesRegister
-from ..settings import (
-    PossibleSides as side,
-    PossibleModes as mode,
-    PossibleSignals as sig,
-)
-
-from ..marketdata.handlers import PriceGetter
-
-
-class Signal:
-
-    def __init__(self, from_side: str, to_side: str, by_stop=False):
-        self.from_side = from_side.capitalize()
-        self.to_side = to_side.capitalize()
-        self.by_stop = by_stop
-
-    def get(self):
-        if self.from_side == self.to_side:
-            return sig.Hold
-
-        if self.from_side == side.Zeroed:
-            if self.to_side == side.Long:
-                return sig.Buy
-
-            if self.to_side == side.Short:
-                return sig.NakedSell
-
-        if self.from_side == side.Long:
-            if self.to_side == side.Zeroed:
-                if self.by_stop:
-                    return sig.StoppedFromLong
-                return sig.Sell
-
-            if to_side == side.Short:
-                return sig.DoubleNakedSell
-
-        if self.from_side == side.Short:
-            if to_side == side.Zeroed:
-                if self.by_stop:
-                    return sig.StoppedFromShort
-                return sig.Buy
-
-            if to_side == side.Long:
-                return sig.DoubleBuy
+from ..marketdata.handlers import BackTestingPriceGetter
+from ..settings import PossibleSignals as sig  # PossibleSides as Side,
 
 
 class OrderHandler:
-    def __init__(self, operation):
+    def __init__(self, operation, log):
         self._now = None
         self.operation = operation
         self.trades = TradesRegister(operation=self.operation)
@@ -60,14 +18,18 @@ class OrderHandler:
                 self.operation.market.quote_asset_symbol
                 + self.operation.market.base_asset_symbol))
 
-        self.Pricing = PriceGetter(
+        self.Pricing = BackTestingPriceGetter(
             broker_name=operation.market.exchange,
             ticker_symbol=(
                 operation.market.quote_asset_symbol
                 + operation.market.base_asset_symbol))
 
+    # def _price(self):
+    #    raise NotImplementedError
+
     def _price(self):
-        raise NotImplementedError
+        self.price = self.Pricing.get(at=self._now)
+        return self.price
 
     def _avaliable(self, _class: str):
         asset = getattr(
@@ -115,15 +77,44 @@ class OrderHandler:
         else:
             print("Passing, signal = 'Hold'")
 
+    def _execute(self):
+        print("Interpreted_signal: {}, price: {}".format(self.signal, self.price))
+        print(" ")
+
 
 class BackTestingOrder(OrderHandler):
-    def __init__(self, operation):
+    def __init__(self, operation, log):
 
-        super(BackTestingOrder, self).__init__(operation)
+        self.Pricing = BackTestingPriceGetter(
+            broker_name=operation.market.exchange,
+            ticker_symbol=(
+                operation.market.quote_asset_symbol
+                + operation.market.base_asset_symbol))
+
+        super(BackTestingOrder, self).__init__()
 
     def _price(self):
         self.price = self.Pricing.for_back_testing(at=self._now)
         return self.price
+
+    def execute(self, signal):
+        if signal != sig.Hold:
+            self.signal = signal
+
+            if self._amount() > self.broker.mininal_amount():
+                self._execute()
+
+                print("Executed because {} > {}".format(
+                    self.quote_asset_amount, self.broker.mininal_amount()))
+                print(" ")
+
+            else:
+                print("Fail because {} < {}".format(
+                    self.quote_asset_amount, self.broker.mininal_amount()))
+                print(" ")
+
+        else:
+            print("Passing, signal = 'Hold'")
 
     def _execute(self):
         print("Interpreted_signal: {}, price: {}".format(self.signal, self.price))
