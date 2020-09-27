@@ -95,26 +95,33 @@ class OperationLog(db.Entity, AttributeUpdater):
     analyzed_by = Optional(str)
     last_analyzed_data = Optional(FloatArray)
     analysis_result = Optional(Json)
+    warnings = Optional(Json)
 
 
 class Log(PrintLog):
     def __init__(self, operation, desired_analyzed_data_information=None):
+        self._warnings_on_a_cycle = {}
         self.operation = operation
         self.desired_analyzed_data_information = (
             kline_desired_informations if not
             desired_analyzed_data_information
             else desired_analyzed_data_information)
-    #    self.results_from = None
-    #    self.last_analyzed_data = None
-    #    self.analysis_result = None
-    #    self.results_from = None
 
-    @db_session
+    def report(self, warning):
+        warning_key = "{}_{}".format(
+            str(warning.reporter),
+            str(pendulum.now().int_timestamp))
+
+        self._warnings_on_a_cycle = {
+            **self._warnings_on_a_cycle,
+            warning_key: warning.report}
+
     def update(self):
         if env.print_log:
             self.print_log()
 
-        self.last_analyzed_data.KlinesDateTime.from_human_readable_to_timestamp()
+        self.last_analyzed_data\
+            .KlinesDateTime.from_human_readable_to_timestamp()
 
         last_analyzed_data = [float(getattr(
             self.last_analyzed_data, information).item())
@@ -127,7 +134,10 @@ class Log(PrintLog):
                 claimed_at=pendulum.now().int_timestamp,
                 analyzed_by=self.analyzed_by,
                 last_analyzed_data=last_analyzed_data,
-                analysis_result=json.dumps(self.analysis_result))
+                analysis_result=json.dumps(self.analysis_result),
+                warnings=json.dumps(self._warnings_on_a_cycle))
+            commit()
+            self._warnings_on_a_cycle = {}
 
 
 class TradeLog(db.Entity, AttributeUpdater):
