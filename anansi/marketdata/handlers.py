@@ -3,7 +3,6 @@ import pandas as pd
 import pendulum
 from . import data_brokers as brokers
 from .indicators import *
-#from .. import settings
 from ..share.tools import ParseDateTime, seconds_in
 from ..share.db_handlers import StorageKlines
 
@@ -56,12 +55,6 @@ class ApplyIndicator:
         self.momentum = Momentum(self._klines)
         self.volatility = Volatility(self._klines)
         self.volume = Volume(self._klines)
-
-# @pd.api.extensions.register_dataframe_accessor("PriceFromKline")
-# class PriceFromKline:
-#    def __init__(self, klines):
-#        self._klines = klines
-#        self.price = indicators.PriceFromKline(self._klines)
 
 
 class KlinesFromBroker:
@@ -251,20 +244,35 @@ class PriceGetter:
         raise NotImplementedError
 
 
+class BackTestingPriceGetter:
+    def __init__(self, broker_name: str, ticker_symbol: str):
+        self.klines = BackTestingKlines(broker_name,
+                                        ticker_symbol,
+                                        time_frame="1m")
+
+    def get(self, at: int) -> float:
+        """ It's possible that the broker - due to a server side issue, 
+        does not have data for the requested period, making the returned
+        klines an empty dataframe. It is possible to reproduce the error
+        by comment/uncomment out the 'klines' variable below. The lower
+        the 'number_of_candles', the greater the possibility of an
+        error. This issue will be checked in the next refactoring, when
+        the klines and prices for back testing will be get from an owned
+        database, after an interpolation process to complete the missing
+        data.
+        """
+
+        klines = self.klines.get(number_of_candles=100, until=at+3000)
+        #klines = self.klines.get(number_of_candles=10, until=at+300)
+        price = klines.apply_indicator.trend.simple_moving_average(
+            number_of_candles=5,
+            metrics="ohlc4")
+        return float(price.serie.mean())
+
+
 class RealTradingPriceGetter(PriceGetter):
     pass
 
 
 class RealTimeTestPriceGetter(PriceGetter):
     pass
-
-
-class BackTestingPriceGetter:  # (PriceGetter):
-    def __init__(self, broker_name: str, ticker_symbol: str):
-        self.klines = BackTestingKlines(broker_name, ticker_symbol)
-        #super(BackTestingPriceGetter, self).__init__()
-
-    def get(self, at: int) -> float:
-        last_kline = self.klines.get(number_of_candles=1, until=at)
-        price = last_kline.PriceFromKline.using(metrics="ohlc4")
-        return price.last()
