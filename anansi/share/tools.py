@@ -222,6 +222,12 @@ class Result:
         self.by_stop = by_stop
 
 
+class WarningContainer:
+    def __init__(self, reporter: str, report: str = None):
+        self.reporter = reporter
+        self.report = report
+
+
 class PrintLog(object):
     def _print_dict(self, entry):
         max_len = 30
@@ -249,4 +255,6 @@ class PrintLog(object):
         print(" ")
         self._print_dict(self.analysis_result)
         print(" ")
+        print("WARNINGS:")
+        self._print_dict(self._warnings_on_a_cycle)
         print(" ")
