@@ -2,7 +2,7 @@ import pendulum
 from .models import Log
 from . import classifiers, stop_handlers, order_handler
 from ..marketdata.handlers import *
-from ..share.tools import get_signal, seconds_in
+from ..share.tools import get_signal, seconds_in, WarningContainer
 from ..settings import (
     PossibleSides as Side,
     PossibleStatuses as stat,
@@ -18,7 +18,7 @@ class DefaultTrader:
 
         self._step = None
         self.operation = operation
-
+        self.warning = WarningContainer(reporter=self.__class__.__name__)
         self.log = Log(operation)
         self.OrderHandler = (order_handler.OrderHandler(operation=operation,
                                                         log=self.log))
@@ -68,13 +68,20 @@ class DefaultTrader:
             if self._now > self._final_backtesting_now:
                 self.operation.status = stat.NotRunning
         else:
-            time.sleep(self._step)  # ! Some calculation is needed here yet
+            sleep_time = (
+                self._step
+                - pendulum.from_timestamp(self._now).second)
+
+            time.sleep(sleep_time)
             self._now = pendulum.now().int_timestamp
 
     def _do_analysis(self):
-        if ((self.operation.stop_on) and
-                (self.operation.position.side != Side.Zeroed)):
+        CheckStop = self.operation.stop_on
 
+        IsPositioned = bool(
+            self.operation.position.side != Side.Zeroed)
+
+        if IsPositioned and CheckStop:
             self._step = self._stop_loss_time_frame_in_seconds
             self._stop_analysis()
 
@@ -90,13 +97,11 @@ class DefaultTrader:
         LastAnalyzedLongerThanTimeFrame = bool(
             self._now >= (
                 self.operation.last_check.by_classifier_at +
-                self._classifier_time_frame_in_seconds)
-        )
+                self._classifier_time_frame_in_seconds))
 
         if LastAnalyzedLongerThanTimeFrame:
             self._analyze_for(self.Classifier)
             self.operation.last_check.update(by_classifier_at=self._now)
-            self.log.update()
 
         else:
             print("Passing classifier analysis, cause there is no new kline to analyze.")
@@ -122,11 +127,10 @@ class DefaultTrader:
         print("It's the end!")  # Not decided what do here yet
 
     def _get_signal_for_(self, result):
-        HoldIfStopped = self.operation.hold_if_stopped  # ! Check if bool or int
+        HoldIfStopped = self.operation.hold_if_stopped
         RecentlyStopped = bool(
             self.operation.position.due_to_signal
-            in [sig.StoppedFromLong, sig.StoppedFromShort]
-        )
+            in [sig.StoppedFromLong, sig.StoppedFromShort])
 
         if HoldIfStopped and RecentlyStopped:
             print("Passing, cause recently stopped!")
@@ -153,7 +157,12 @@ class DefaultTrader:
     def run(self):
         self._start()
         while self.operation.status == stat.Running:
-            self._do_analysis()
-            self._get_ready_to_repeat()
+            try:
+                self._do_analysis()
+                self._get_ready_to_repeat()
+            except Exception as e:
+                self.warning.report = str(e)
+                self.log.report(self.warning)
 
+            self.log.update()
         self._end()
