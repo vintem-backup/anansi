@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from ..settings import PossibleSides as Side, PossibleSignals as sig
+from ..settings import (PossibleSides as SIDE,
+                        PossibleSignals as SIG, PossibleOrderTypes as ORD)
 import json
 from collections import namedtuple
 from functools import wraps, partial
@@ -32,6 +33,18 @@ def seconds_in(time_frame: str) -> int:
     return time_amount*conversor_for[time_unit]
 
 
+class Serialize:
+    def __init__(self, Target: object):
+        self.Target = Target
+
+    def to_dict(self) -> dict:
+        return json.loads(json.dumps(
+            self.Target, default=lambda o: o.__dict__, indent=0))
+
+    def to_json(self) -> str:
+        return json.dumps(self.to_dict())
+
+
 class Deserialize:
     def __init__(self, name='X'):
         self.name = name
@@ -39,11 +52,11 @@ class Deserialize:
     def _json_object_hook(self, d):
         return namedtuple(self.name, d.keys())(*d.values())
 
-    def json2obj(self, json_in):
+    def from_json(self, json_in: str) -> object:
         return json.loads(json_in, object_hook=self._json_object_hook)
 
-    def dict2obj(self, dict_in):
-        return self.json2obj(json_in=json.dumps(dict_in))
+    def from_dict(self, dict_in: dict) -> object:
+        return self.from_json(json_in=json.dumps(dict_in))
 
 
 def timing(f):
@@ -184,77 +197,93 @@ class Signal:
 
     def get(self):
         if self.from_side == self.to_side:
-            return sig.Hold
+            return SIG.Hold
 
-        if self.from_side == Side.Zeroed:
-            if self.to_side == Side.Long:
-                return sig.Buy
+        if self.from_side == SIDE.Zeroed:
+            if self.to_side == SIDE.Long:
+                return SIG.Buy
 
-            if self.to_side == Side.Short:
-                return sig.NakedSell
+            if self.to_side == SIDE.Short:
+                return SIG.NakedSell
 
-        if self.from_side == Side.Long:
-            if self.to_side == Side.Zeroed:
+        if self.from_side == SIDE.Long:
+            if self.to_side == SIDE.Zeroed:
                 if self.by_stop:
-                    return sig.StoppedFromLong
-                return sig.Sell
+                    return SIG.StoppedFromLong
+                return SIG.Sell
 
-            if to_side == Side.Short:
-                return sig.DoubleNakedSell
+            if self.to_side == SIDE.Short:
+                return SIG.DoubleNakedSell
 
-        if self.from_side == Side.Short:
-            if to_side == Side.Zeroed:
+        if self.from_side == SIDE.Short:
+            if self.to_side == SIDE.Zeroed:
                 if self.by_stop:
-                    return sig.StoppedFromShort
-                return sig.Buy
+                    return SIG.StoppedFromShort
+                return SIG.Buy
 
-            if to_side == Side.Long:
-                return sig.DoubleBuy
+            if self.to_side == SIDE.Long:
+                return SIG.DoubleBuy
 
 
 def get_signal(from_side, to_side, by_stop):
     return Signal(from_side, to_side, by_stop).get()
 
 
-class Result:
-    def __init__(self, which_side: str, by_stop=False):
-        self.side = which_side
-        self.by_stop = by_stop
+# class Result:
+#    def __init__(self, which_side: str, by_stop=False):
+#        self.side = which_side
+#        self.by_stop = by_stop
 
 
-class WarningContainer:
-    def __init__(self, reporter: str, report: str = None):
+class EventContainer:
+    def __init__(self, reporter: str, description: str = None):
         self.reporter = reporter
-        self.report = report
+        self.description = description
 
 
-class PrintLog(object):
-    def _print_dict(self, entry):
-        max_len = 30
-
+class DefaultPrintLog(object):
+    def _print_collection(self, entry):
+        max_n_dots = 30
         for item in entry.items():
+            n_dots = max_n_dots - len(item[0])
             print(
-                "{}{}: {}".format(item[0],
-                                  "".join((max_len - len(item[0]))*["."]),
-                                  item[1]))
+                "{}{}: {}".format(item[0], "".join(n_dots*["."]), item[1]))
 
     def print_log(self):
-        kline = (
-            self.last_analyzed_data.loc[
-                :, self.last_analyzed_data.columns != 'Open_time'])
+        print("======================================")
+        print("Claimed at: {}".format(
+            pendulum.now().format(fmt="YYYY-MMMM-DD HH:mm:ss")))
+        print("======================================")
+        print(" ")
 
-        print("==============================")
-        print("Open_time: {}".format(
-            self.last_analyzed_data.Open_time.item()))
-        print("==============================")
+        if len(self.last_analyzed_data) > 0:
+            print("# LAST ANALYZED DATA BY {}:".format(
+                (self.analyzed_by).upper()))
 
+            print(" ")
+            self._print_collection(self.last_analyzed_data)
+            print(" ")
+            print("# Results:")
+            print(" ")
+            self._print_collection(self.analysis_result)
+            print(" ")
+            print("# Order:")
+            self._print_collection(self.order)
+
+        print("# Events:")
         print(" ")
-        print(kline.to_string(index=False))
+        self._print_collection(self.events_on_a_cycle)
         print(" ")
-        print("## Analyzed_by: {} ##".format(self.analyzed_by))
+        print("# Portfolio composition:")
         print(" ")
-        self._print_dict(self.analysis_result)
-        print(" ")
-        print("WARNINGS:")
-        self._print_dict(self._warnings_on_a_cycle)
+        try:
+            self._print_collection(
+                json.loads(self.operation.user.portfolio.assets))
+
+        except:
+            try:
+                self._print_collection(
+                    self.operation.user.portfolio.assets)
+            except:
+                pass
         print(" ")
