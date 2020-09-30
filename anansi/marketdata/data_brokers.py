@@ -90,7 +90,7 @@ class DataBroker:
         raise NotImplementedError
 
 
-class BinanceDataBroker(DataBroker, settings.Binance_):
+class BinanceDataBroker(DataBroker, settings.BinanceSettings):
     @doc_inherit
     def __init__(self):
         super(BinanceDataBroker, self).__init__()
