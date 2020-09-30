@@ -40,7 +40,7 @@ class StopTrailing3T:
                 treshold=Treshold(n_measurements=10, n_positives=3))
 
     def __init__(self, parameters, log, data_to_analyze=None):
-        self.parameters = deserialize.json2obj(parameters)
+        self.parameters = deserialize.from_json(parameters)
         self.log = log
         self.data_to_analyze = data_to_analyze
         self.n_samples_to_analyze = max(
@@ -50,5 +50,5 @@ class StopTrailing3T:
             self.parameters.update_target_if.treshold.n_measurements,
         )
 
-    def result(self):
+    def get_result(self):
         pass
