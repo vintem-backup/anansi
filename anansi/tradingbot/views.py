@@ -2,20 +2,19 @@ import json
 from . import classifiers, stop_handlers
 from .models import *
 from ..settings import Default
+from ..share.tools import Serialize
 
 
-def parameter_dict_for(analyzer):
-    return json.dumps(
-        analyzer.DefaultParameters(), default=lambda o: o.__dict__, indent=4
-    )
+def parameters_for(analyzer):
+    return Serialize(analyzer.DefaultParameters()).to_json()
 
 
 def DefaultClassifierParameters():
-    return parameter_dict_for(getattr(classifiers, Default.classifier))
+    return parameters_for(getattr(classifiers, Default.classifier))
 
 
 def DefaultStopLossParameters():
-    return parameter_dict_for(getattr(stop_handlers, Default.stop_loss))
+    return parameters_for(getattr(stop_handlers, Default.stop_loss))
 
 
 @db_session
