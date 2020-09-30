@@ -1,121 +1,146 @@
+import json
+import math
 from . import trade_brokers
 from .models import Portfolio, TradesRegister
-from ..marketdata.handlers import BackTestingPriceGetter
-from ..settings import PossibleSignals as sig  # PossibleSides as Side,
+from ..marketdata.handlers import *
+from ..settings import (PossibleSides as SIDE, PossibleModes as MODE,
+                        PossibleSignals as SIG, PossibleOrderTypes as ORD)
+from ..share.tools import Serialize, EventContainer
 
 
 class OrderHandler:
     def __init__(self, operation, log):
-        self._now = None
+        self.quote_key = "{}".format(operation.market.quote_asset_symbol)
+        self.base_key = "{}".format(operation.market.base_asset_symbol)
+        ticker_symbol = self.quote_key + self.base_key
+
         self.operation = operation
-        self.trades = TradesRegister(operation=self.operation)
-        self.portfolio = operation.user.portfolio.assets
-        self.signal = None
-        self.quote_asset_amount = None
-        self.price = None
-        self.broker = getattr(trade_brokers, self.operation.market.exchange)(
-            ticker_symbol=(
-                self.operation.market.quote_asset_symbol
-                + self.operation.market.base_asset_symbol))
+        self.event = EventContainer(reporter=self.__class__.__name__)
+        self.trades = TradesRegister(operation)
+        self.log = log
+        self.order = None
+        self._new_quote_amount = None
+        self._new_base_amount = None
 
-        self.Pricing = BackTestingPriceGetter(
-            broker_name=operation.market.exchange,
-            ticker_symbol=(
-                operation.market.quote_asset_symbol
-                + operation.market.base_asset_symbol))
+        self.broker = getattr(
+            trade_brokers, "{}OrderBroker".format(
+                (operation.market.exchange).capitalize()))(ticker_symbol)
 
-    # def _price(self):
-    #    raise NotImplementedError
+        self.Pricing = (
+            BackTestingPriceGetter(operation.market.exchange, ticker_symbol)
+            if operation.mode == MODE.BackTesting
+            else PriceGetter(operation.market.exchange, ticker_symbol))
 
-    def _price(self):
-        self.price = self.Pricing.get(at=self._now)
-        return self.price
+        self._execute = getattr(
+            self, "_{}OrderExecutor".format(operation.mode))
 
-    def _avaliable(self, _class: str):
-        asset = getattr(
-            self.operation.market, "{}_asset_symbol".format(_class))
+        self._now = None
 
+    def _avaliable(self, asset: str):
         try:
-            return self.portfolio[asset]
+            return self.operation.user.portfolio.assets[asset]
+        except:
+            try:
+                return(
+                    json.loads(self.operation.user.portfolio.assets)[asset])
 
-        except Exception as e:
-            print("Fail get_in_portfolio due", e)
-            return 0.0
+            except Exception as e:
+                self.event.description = (
+                    "Fail to get asset in portfolio due to {}".format(e))
 
-    def _amount(self):
+                self.log.report(self.event)
+                return 0.0
+
+    def _refresh_price(self):
+        price = self.Pricing.get(at=self._now)
+        if not math.isnan(price):
+            self.order.price = price
+
+    def _calculate_amount(self):
+        self._refresh_price()
+        price = self.order.price
+        signal = self.order.signal
         exposure_factor = self.operation.exposure_factor
+        raw_amount = 0.0
 
-        raw_quote_asset_amount = (
-            (self._avaliable("base")/self._price()) * exposure_factor
-            if self.signal == sig.Buy
-            else self._avaliable("quote") * exposure_factor
-            if self.signal == sig.Sell
-            else 0.0)
+        if signal in [SIG.Buy, SIG.StopFromShort, SIG.DoubleBuy]:
+            raw_amount = (2*self._avaliable(self.base_key)/price
+                          if signal == SIG.DoubleBuy
+                          else self._avaliable(self.base_key)/price)
+
+        elif signal in [SIG.Sell, SIG.StopFromLong, SIG.DoubleNakedSell]:
+            raw_amount = (2*self._avaliable(self.quote_key)
+                          if signal == SIG.DoubleNakedSell
+                          else self._avaliable(self.quote_key))
 
         integer_factor = int(
-            raw_quote_asset_amount/self.broker.mininal_amount())
+            exposure_factor*raw_amount/self.broker.mininal_amount)
 
-        self.quote_asset_amount = integer_factor*self.broker.mininal_amount()
-        return self.quote_asset_amount
+        self.order.amount = integer_factor*self.broker.mininal_amount
 
-    def execute(self, signal):
-        if signal != sig.Hold:
-            self.signal = signal
+    def _proceed_updates(self):
+        NewAssetsComposition = {
+            self.quote_key: self._new_quote_amount,
+            self.base_key: self._new_base_amount}
 
-            if self._amount() > self.broker.mininal_amount():
+        self.operation.user.portfolio.update(
+            assets=json.dumps(NewAssetsComposition))
+
+        print("side: {}, size_by_quote: {}, due_to_signal: {}".format(
+            self._to_side, self.order.amount, self.order.signal))
+
+        self.operation.position.update(side=self._to_side,
+                                       size_by_quote=self.order.amount,
+                                       due_to_signal=self.order.signal)
+
+        self.event.description = (
+            "Trade due to signal {}".format(self.order.signal))
+
+        self.log.report(self.event)
+
+    def _BackTestingOrderExecutor(self):
+        signal = self.order.signal
+        fee_quoted = self.broker.fee_rate_decimal*self.order.amount
+        fee_base = fee_quoted*self.order.price
+
+        if signal in [SIG.Buy, SIG.StopFromShort, SIG.DoubleBuy]:
+            self._to_side = self.order.to_side
+
+            spent_base_amount = self.order.amount*self.order.price
+            bought_quote_amount = self.order.amount - fee_quoted
+
+            self._new_quote_amount = (
+                self._avaliable(self.quote_key) + bought_quote_amount)
+
+            self._new_base_amount = (
+                self._avaliable(self.base_key) - spent_base_amount)
+
+            self._proceed_updates()
+
+        elif signal in [SIG.Sell, SIG.StopFromLong, SIG.DoubleNakedSell]:
+            self._to_side = self.order.to_side
+
+            spent_quote_amount = self.order.amount
+            bought_base_amount = self.order.amount*self.order.price - fee_base
+
+            self._new_quote_amount = (
+                self._avaliable(self.quote_key) - spent_quote_amount)
+
+            self._new_base_amount = (
+                self._avaliable(self.base_key) + bought_base_amount)
+
+            self._proceed_updates()
+
+    def execute(self, order):
+        if order.signal not in [SIG.Hold, SIG.StopByPassed]:
+            self.log.order = Serialize(order).to_dict()
+            self.order = order
+
+            if order.order_type == ORD.Market:
+                self._calculate_amount()
+
+            EnoughFunds = bool(
+                self.order.amount > self.broker.mininal_amount)
+
+            if EnoughFunds:
                 self._execute()
-
-                print("Executed because {} > {}".format(
-                    self.quote_asset_amount, self.broker.mininal_amount()))
-                print(" ")
-
-            else:
-                print("Fail because {} < {}".format(
-                    self.quote_asset_amount, self.broker.mininal_amount()))
-                print(" ")
-
-        else:
-            print("Passing, signal = 'Hold'")
-
-    def _execute(self):
-        print("Interpreted_signal: {}, price: {}".format(self.signal, self.price))
-        print(" ")
-
-
-class BackTestingOrder(OrderHandler):
-    def __init__(self, operation, log):
-
-        self.Pricing = BackTestingPriceGetter(
-            broker_name=operation.market.exchange,
-            ticker_symbol=(
-                operation.market.quote_asset_symbol
-                + operation.market.base_asset_symbol))
-
-        super(BackTestingOrder, self).__init__()
-
-    def _price(self):
-        self.price = self.Pricing.for_back_testing(at=self._now)
-        return self.price
-
-    def execute(self, signal):
-        if signal != sig.Hold:
-            self.signal = signal
-
-            if self._amount() > self.broker.mininal_amount():
-                self._execute()
-
-                print("Executed because {} > {}".format(
-                    self.quote_asset_amount, self.broker.mininal_amount()))
-                print(" ")
-
-            else:
-                print("Fail because {} < {}".format(
-                    self.quote_asset_amount, self.broker.mininal_amount()))
-                print(" ")
-
-        else:
-            print("Passing, signal = 'Hold'")
-
-    def _execute(self):
-        print("Interpreted_signal: {}, price: {}".format(self.signal, self.price))
-        print(" ")
