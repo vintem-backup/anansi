@@ -20,7 +20,7 @@ Perform the commands:
     poetry run python -m ipykernel install --user --name=$(basename $(pwd))
     poetry run jupyter notebook > jupyterlog 2>&1 &
 
-## Just to the point: Running Default Back Testing Operation
+## Straight to the point: Running Default Back Testing Operation
 
 ### Importing Dependencies
 
