@@ -4,13 +4,15 @@
 
 Python, Pip, Poetry.
 
-To install [poetry](https://python-poetry.org/) with pip (supposing you have python and pip already installed):
+To install [poetry](https://python-poetry.org/) with pip (supposing you
+have python and pip already installed):
 
     pip install poetry
 
 ## Consuming on Jupyter notebook
 
-**That is only a suggestion. Tested only on linux environment.**
+**That is only a suggestion, you could run anansi on any python
+terminal. Only tested on linux.**
 
 Perform the commands:
 
@@ -18,18 +20,17 @@ Perform the commands:
     poetry run python -m ipykernel install --user --name=$(basename $(pwd))
     poetry run jupyter notebook > jupyterlog 2>&1 &
 
-## Draft "how to"
+## Just to the point: Running Default Back Testing Operation
 
-### Playing with the database models
+### Importing Dependencies
 
 ```python
-from pony.orm import *
 from anansi.tradingbot.models import *
 from anansi.tradingbot import traders
 from anansi.tradingbot.views import create_user, create_default_operation
 ```
 
-#### Add new user
+### Add a new user
 
 ```python
 my_user_first_name = "John"
@@ -39,7 +40,29 @@ create_user(first_name=my_user_first_name,
                    email = "{}@email.com".format(my_user_first_name.lower()))
 ```
 
-#### Getting all users
+### Creating a default operation
+
+```python
+my_user = User[1]
+create_default_operation(user=my_user)
+```
+
+### Instantiating a trader
+
+```python
+my_op = Operation.get(id=1)
+my_trader = traders.DefaultTrader(operation=my_op)
+```
+
+### Run the trader
+
+```python
+my_trader.run()
+```
+
+## Playing with the database models
+
+### Getting all users
 
 ```python
 users = select(user for user in User)
@@ -50,27 +73,13 @@ users.show()
     --+----------+---------+--------------------+--------------
     1 |John      |Doe      |                    |john@email.com
 
-#### Creating a default operation
-
-```python
-my_user = User[1]
-create_default_operation(user=my_user)
-```
-
 ```python
 my_user.first_name
 ```
 
     'John'
 
-### Instantiating a trader
-
-```python
-my_op = Operation.get(id=1)
-my_trader = traders.DefaultTrader(operation=my_op)
-```
-
-#### An operation attribute test
+### Some operation attribute
 
 ```python
 my_op.stop_loss.name
@@ -78,7 +87,7 @@ my_op.stop_loss.name
 
     'StopTrailing3T'
 
-#### A trader attribute test
+### Some trader attribute
 
 ```python
 my_trader.Classifier.parameters.time_frame
@@ -86,11 +95,13 @@ my_trader.Classifier.parameters.time_frame
 
     '6h'
 
-#### Some random update method test
+### Updating some attributes
 
 ```python
 before_update = my_trader.operation.position.side, my_trader.operation.position.exit_reference_price
+
 my_trader.operation.position.update(side="Long", exit_reference_price=1020.94)
+
 after_update = my_trader.operation.position.side, my_trader.operation.position.exit_reference_price
 
 before_update, after_update
@@ -98,14 +109,25 @@ before_update, after_update
 
     (('Zeroed', None), ('Long', 1020.94))
 
-### Klines treated and ready for use - including market indicators methods - using the module "*klines*"
+## Requesting klines
+
+### Klines treated and ready for use, including market indicators methods
+
+The example below uses the 'KlinesFromBroker' class from the 'handlers'
+module ('marketdata' package), which works as an abstraction over the
+data brokers, not only serializing requests (in order to respect
+brokers' limits), but also conforming the klines like a pandas
+dataframe,
+[extended](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.api.extensions.register_dataframe_accessor.html)
+with market indicator methods.
 
 ```python
-from anansi.marketdata import klines
+from anansi.marketdata.handlers import KlinesFromBroker
 ```
 
 ```python
-BinanceKlines = klines.FromBroker(broker_name="binance", symbol="BTCUSDT", time_frame="1h")
+BinanceKlines = KlinesFromBroker(
+  broker_name="binance", ticker_symbol="BTCUSDT", time_frame="1h")
 ```
 
 ```python
@@ -247,7 +269,7 @@ newest_klines
 <p>2167 rows × 6 columns</p>
 </div>
 
-#### Applying simple moving average  indicators
+### Applying simple moving average  indicators
 
 ```python
 indicator = newest_klines.apply_indicator.trend.simple_moving_average(number_of_candles=35)
@@ -407,11 +429,11 @@ newest_klines
 <p>2167 rows × 6 columns</p>
 </div>
 
-#### Same as above, but showing indicator column
+### Same as above, but showing indicator column
 
 ```python
-indicator = newest_klines.apply_indicator.trend.simple_moving_average(number_of_candles=35,
-                                                          create_indicator_column=True)
+indicator = newest_klines.apply_indicator.trend.simple_moving_average(
+  number_of_candles=35, indicator_column="SMA_OHLC4_n35")
 ```
 
 ```python
@@ -442,7 +464,7 @@ newest_klines
       <th>Low</th>
       <th>Close</th>
       <th>Volume</th>
-      <th>sma_ohlc4_35</th>
+      <th>SMA_OHLC4_n35</th>
     </tr>
   </thead>
   <tbody>
@@ -561,18 +583,22 @@ newest_klines
 <p>2167 rows × 7 columns</p>
 </div>
 
-### Raw klines, using the module "*data_brokers*" directly
+### Raw klines, using the low level abstraction module "*data_brokers*"
+
+**DISCLAIMER: Requests here are not queued! There is a risk of banning
+the IP or even blocking API keys if some limits are exceeded. Use with
+caution.**
 
 ```python
 from anansi.marketdata import data_brokers
 ```
 
 ```python
-BinanceBroker = data_brokers.BinanceDataWrapper()
+BinanceBroker = data_brokers.BinanceDataBroker()
 ```
 
 ```python
-my_klines = BinanceBroker.get_klines(symbol="BTCUSDT", time_frame="1m")
+my_klines = BinanceBroker.get_klines(ticker_symbol="BTCUSDT", time_frame="1m")
 ```
 
 ```python
@@ -710,8 +736,10 @@ my_klines
 <p>499 rows × 6 columns</p>
 </div>
 
+### Same as above, but returning all information get from the data broker
+
 ```python
-my_klines = BinanceBroker.get_klines(symbol="BTCUSDT", time_frame="1m", show_only_desired_info=False)
+my_klines = BinanceBroker.get_klines(ticker_symbol="BTCUSDT", time_frame="1m", show_only_desired_info=False)
 ```
 
 ```python
