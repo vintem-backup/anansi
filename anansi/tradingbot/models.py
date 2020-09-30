@@ -2,8 +2,8 @@
 import json
 import pendulum
 from pony.orm import *
-from ..settings import *  # Default, Environments
-from ..share.tools import PrintLog
+from ..settings import *
+from ..share.tools import DefaultPrintLog
 from ..share.db_handlers import Storage
 
 db, env = Database(), Environments.ENV
@@ -57,7 +57,7 @@ class StopLoss(db.Entity, AttributeUpdater):
     parameters = Optional(Json)
 
 
-class Market(db.Entity):  # I's not advise make attributes editable.
+class Market(db.Entity):  # I's not advise make below attributes editable.
     operation = Optional(lambda: Operation)  # Foreing key
     exchange = Required(str, default=Default.exchange)
     quote_asset_symbol = Required(str, default=Default.quote_asset_symbol)
@@ -83,61 +83,87 @@ class Operation(db.Entity, AttributeUpdater):
 
     status = Required(str, default=Default.status)
     mode = Required(str, default=Default.mode)
-    stop_on = Required(bool, default=True)
+    stop_is_on = Required(bool, default=False)
     hold_if_stopped = Required(bool, default=True)
 
     last_check = Required(LastCheck)
 
 
-class OperationLog(db.Entity, AttributeUpdater):
+class OperationLog(db.Entity):
+    # Present in all logs:
     operation = Optional(Operation)  # Foreing key
     claimed_at = Optional(int)  # UTC timestamp
+    # Optional on each log:
     analyzed_by = Optional(str)
-    last_analyzed_data = Optional(FloatArray)
+    last_analyzed_data = Optional(Json)
     analysis_result = Optional(Json)
-    warnings = Optional(Json)
+    order = Optional(Json)
+    events = Optional(Json)
 
 
-class Log(PrintLog):
+class DefaultLog(DefaultPrintLog):
     def __init__(self, operation, desired_analyzed_data_information=None):
-        self._warnings_on_a_cycle = {}
         self.operation = operation
+
         self.desired_analyzed_data_information = (
             kline_desired_informations if not
             desired_analyzed_data_information
             else desired_analyzed_data_information)
 
-    def report(self, warning):
-        warning_key = "{}_{}".format(
-            str(warning.reporter),
+        self.append_log_to_database = getattr(
+            self, "_{}LogAppend".format(operation.mode))
+
+        self._reset_collections()
+
+    def _reset_collections(self):
+        self.last_analyzed_data = dict()
+        self.analysis_result = dict()
+        self.order = dict()
+        self.events_on_a_cycle = dict()
+
+    def _data_dicts_to_json(self):
+        self.last_analyzed_data = json.dumps(self.last_analyzed_data)
+        self.analysis_result = json.dumps(self.analysis_result)
+        self.events_on_a_cycle = json.dumps(self.events_on_a_cycle)
+        self.order = json.dumps(self.order)
+
+    def _CreateOperationLog(self, **kwargs):
+        self.operation.logs.create(
+            **kwargs, claimed_at=pendulum.now().int_timestamp)
+        commit()
+        self._reset_collections()
+
+    def _BackTestingLogAppend(self):
+
+        kwargs = dict(
+            analyzed_by=self.analyzed_by,
+            last_analyzed_data=self.last_analyzed_data,
+            analysis_result=self.analysis_result,
+            events=self.events_on_a_cycle)
+
+        self._CreateOperationLog(**kwargs)
+
+    def _RealTradingLogAppend(self):
+        pass
+
+    def _RealTimeTestLogappend(self):
+        pass
+
+    def report(self, event):
+        event_key = "{}_{}".format(
+            str(event.reporter),
             str(pendulum.now().int_timestamp))
 
-        self._warnings_on_a_cycle = {
-            **self._warnings_on_a_cycle,
-            warning_key: warning.report}
+        self.events_on_a_cycle = {
+            **self.events_on_a_cycle,
+            event_key: event.description}
 
     def update(self):
         if env.print_log:
             self.print_log()
 
-        self.last_analyzed_data\
-            .KlinesDateTime.from_human_readable_to_timestamp()
-
-        last_analyzed_data = [float(getattr(
-            self.last_analyzed_data, information).item())
-            for information in
-            self.desired_analyzed_data_information]
-
-        if self.operation.mode == PossibleModes.BackTesting:
-
-            self.operation.logs.create(
-                claimed_at=pendulum.now().int_timestamp,
-                analyzed_by=self.analyzed_by,
-                last_analyzed_data=last_analyzed_data,
-                analysis_result=json.dumps(self.analysis_result),
-                warnings=json.dumps(self._warnings_on_a_cycle))
-            commit()
-            self._warnings_on_a_cycle = {}
+        self._data_dicts_to_json()
+        self.append_log_to_database()
 
 
 class TradeLog(db.Entity, AttributeUpdater):
