@@ -268,11 +268,3 @@ class BackTestingPriceGetter:
             number_of_candles=5,
             metrics="ohlc4")
         return float(price.serie.mean())
-
-
-class RealTradingPriceGetter(PriceGetter):
-    pass
-
-
-class RealTimeTestPriceGetter(PriceGetter):
-    pass
