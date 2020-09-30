@@ -1,14 +1,24 @@
 import pendulum
-from .models import Log
+from .models import DefaultLog
 from . import classifiers, stop_handlers, order_handler
 from ..marketdata.handlers import *
-from ..share.tools import get_signal, seconds_in, WarningContainer
+from ..share.tools import *
 from ..settings import (
-    PossibleSides as Side,
-    PossibleStatuses as stat,
-    PossibleModes as mode,
-    PossibleSignals as sig,
+    PossibleSides as SIDE,
+    PossibleStatuses as STAT,
+    PossibleModes as MODE,
+    PossibleSignals as SIG,
+    PossibleOrderTypes as ORD,
 )
+
+
+class Order:
+    # def __init__(self):
+    signal: str = SIG.Hold
+    to_side: str = None
+    order_type = ORD.Market
+    amount: float = None
+    price: float = None
 
 
 class DefaultTrader:
@@ -18,8 +28,10 @@ class DefaultTrader:
 
         self._step = None
         self.operation = operation
-        self.warning = WarningContainer(reporter=self.__class__.__name__)
-        self.log = Log(operation)
+        self.event = EventContainer(reporter=self.__class__.__name__)
+        self.log = DefaultLog(operation)
+        self.result = None
+        self.order = Order()
         self.OrderHandler = (order_handler.OrderHandler(operation=operation,
                                                         log=self.log))
 
@@ -35,18 +47,19 @@ class DefaultTrader:
         self._stop_loss_time_frame_in_seconds = seconds_in(
             self.StopLoss.parameters.time_frame)
 
-        self.Klines = (
-            BackTestingKlines(operation.market.exchange, ticker_symbol)
-            if operation.mode == mode.BackTesting
-            else KlinesFromBroker(operation.market.exchange, ticker_symbol))
+        self.Klines = KlinesFromBroker(
+            operation.market.exchange, ticker_symbol)
 
-        self._now = (
-            self._get_initial_backtesting_now()
-            if self.operation.mode == mode.BackTesting
-            else pendulum.now().int_timestamp)
+        self._now = pendulum.now().int_timestamp
+
+        if self.operation.mode == MODE.BackTesting:
+            self.Klines = BackTestingKlines(
+                operation.market.exchange, ticker_symbol)
+
+            self._now = self._get_initial_backtesting_now()
+            self._final_backtesting_now = self._get_final_backtesting_now()
 
         self.OrderHandler._now = self._now  # Important if BackTesting mode
-        self._final_backtesting_now = self._get_final_backtesting_now()
 
     def _get_initial_backtesting_now(self):
         self.Klines.time_frame = self.Classifier.parameters.time_frame
@@ -61,50 +74,46 @@ class DefaultTrader:
         return self.Klines._newest_open_time()
 
     def _get_ready_to_repeat(self):
-        if self.operation.mode == mode.BackTesting:
+        if self.operation.mode == MODE.BackTesting:
             self._now += self._step
             self.OrderHandler._now = self._now  # Important if BackTesting mode
 
             if self._now > self._final_backtesting_now:
-                self.operation.status = stat.NotRunning
+                self.operation.status = STAT.NotRunning
         else:
-            sleep_time = (
-                self._step
-                - pendulum.from_timestamp(self._now).second)
+            sleep_time = (self._step
+                          - pendulum.from_timestamp(self._now).second)
 
             time.sleep(sleep_time)
             self._now = pendulum.now().int_timestamp
 
     def _do_analysis(self):
-        CheckStop = self.operation.stop_on
-
+        self._step = self._classifier_time_frame_in_seconds
+        CheckStop = self.operation.stop_is_on
         IsPositioned = bool(
-            self.operation.position.side != Side.Zeroed)
+            self.operation.position.side != SIDE.Zeroed)
 
         if IsPositioned and CheckStop:
             self._step = self._stop_loss_time_frame_in_seconds
             self._stop_analysis()
 
-        else:
-            self._step = self._classifier_time_frame_in_seconds
-
         self._classifier_analysis()
 
     def _stop_analysis(self):
-        print("Finally stop alalysis! But, nothing here :/")
+        print("Entering on null stoploss")
 
     def _classifier_analysis(self):
-        LastAnalyzedLongerThanTimeFrame = bool(
+        NewDataToAnalyze = bool(
             self._now >= (
                 self.operation.last_check.by_classifier_at +
                 self._classifier_time_frame_in_seconds))
 
-        if LastAnalyzedLongerThanTimeFrame:
+        if NewDataToAnalyze:
             self._analyze_for(self.Classifier)
             self.operation.last_check.update(by_classifier_at=self._now)
 
         else:
-            print("Passing classifier analysis, cause there is no new kline to analyze.")
+            print("No new data do analyze")
 
     def _analyze_for(self, Analyzer):
         self.Klines.time_frame = Analyzer.parameters.time_frame
@@ -113,56 +122,75 @@ class DefaultTrader:
             number_of_candles=Analyzer.n_samples_to_analyze,
             until=self._now)
 
-        signal = self._get_signal_for_(Analyzer.result())
-        self.OrderHandler.execute(signal)
+        self.result = Analyzer.get_result()
 
     def _start(self):
-        self.operation.update(status=stat.Running)
+        self.operation.update(status=STAT.Running)
 
-        if self.operation.mode == mode.BackTesting:
+        if self.operation.mode == MODE.BackTesting:
             self.operation.last_check.update(by_classifier_at=0)
-            self.operation.position.update(Side=Side.Zeroed)
+            self.operation.position.update(Side=SIDE.Zeroed)
 
-    def _end(self):
-        print("It's the end!")  # Not decided what do here yet
+    def _end(self):  # Not decided what do here yet
+        self.event.description = "It's the end!"
+        self.log.report(self.event)
 
-    def _get_signal_for_(self, result):
-        HoldIfStopped = self.operation.hold_if_stopped
-        RecentlyStopped = bool(
-            self.operation.position.due_to_signal
-            in [sig.StoppedFromLong, sig.StoppedFromShort])
+    def _prepare_order(self):
+        self.order.price = self.result.price
 
-        if HoldIfStopped and RecentlyStopped:
-            print("Passing, cause recently stopped!")
-            return sig.Hold
+        signal = get_signal(
+            from_side=self.operation.position.side,
+            to_side=self.result.side,
+            by_stop=self.result.by_stop)
 
-        else:
-            signal = get_signal(
-                from_side=self.operation.position.side,
-                to_side=result.side,
-                by_stop=result.by_stop)
+        self.event.description = "Original signal: {}".format(signal)
+        self.log.report(self.event)
 
-            print(" ")
-            print("Original_signal: ", signal)
+        HoldIfRecentlyStopped = self.operation.hold_if_stopped
 
-            return (
-                sig.Hold
-                if signal == sig.NakedSell
-                else sig.Sell
-                if signal == sig.DoubleNakedSell
-                else sig.Buy
-                if signal == sig.DoubleBuy
-                else signal)
+        if HoldIfRecentlyStopped:
+            StoppedFromLong = bool(
+                self.operation.position.due_to_signal == SIG.StopFromLong)
+
+            StoppedFromShort = bool(
+                self.operation.position.due_to_signal == SIG.StopFromShort)
+
+            IgnoreSignalDueToStop = bool(
+                (signal == SIG.Buy and StoppedFromLong) or
+                (signal == SIG.Sell and StoppedFromShort))
+
+            if IgnoreSignalDueToStop:
+                signal = SIG.StopByPassed
+                self.event.description = signal
+                self.log.report(self.event)
+
+        if signal == SIG.NakedSell:
+            self.order.signal = SIG.Hold
+
+        elif signal == SIG.DoubleNakedSell:
+            self.order.signal = SIG.Sell
+
+        elif signal == SIG.DoubleBuy:
+            self.order.signal = SIG.Buy
+
+        if self.order.signal == SIG.Buy:
+            self.order.to_side = SIDE.Long
+
+        if self.order.signal == SIG.Sell:
+            self.order.to_side = SIDE.Zeroed
 
     def run(self):
         self._start()
-        while self.operation.status == stat.Running:
-            try:
-                self._do_analysis()
-                self._get_ready_to_repeat()
-            except Exception as e:
-                self.warning.report = str(e)
-                self.log.report(self.warning)
+        while self.operation.status == STAT.Running:
+            # try:
+            self._do_analysis()
+            self._prepare_order()
+            self.OrderHandler.execute(self.order)
+            self._get_ready_to_repeat()
+
+            # except Exception as e:
+            #    self.event.description = str(e)
+            #    self.log.report(self.event)
 
             self.log.update()
         self._end()
