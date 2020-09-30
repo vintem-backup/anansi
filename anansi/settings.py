@@ -1,5 +1,18 @@
 import os
-AUTO_START = False
+
+
+def GetEnvironment(var_name, default):
+    try:
+        return os.environ[var_name]
+    except:
+        try:
+            return default
+        except KeyError:
+            error_msg = 'Set the {} environment variable'.format(var_name)
+            raise ImproperlyConfigured(error_msg)
+
+
+AUTO_START = GetEnvironment("AUTO_START", default=False)
 
 
 class Environments:
@@ -23,6 +36,10 @@ class Environments:
                            password='', host='', database='')
 
     ENV = Dev
+
+
+class SupportedExchanges:
+    binance = "Binance"
 
 
 class ImplementedTraders:
@@ -52,19 +69,23 @@ class PossibleSides:
     Zeroed = "Zeroed"
     Long = "Long"
     Short = "Short"
-    Classifying = "Classifying"  # ! Is really needed?
 
 
 class PossibleSignals:
-    StopPassed = "StopPassed"  # ! Is really needed?
+    StopByPassed = "StopByPassed"
     Hold = "Hold"
     Buy = "Buy"
     Sell = "Sell"
     NakedSell = "NakedSell"
     DoubleNakedSell = "DoubleNakedSell"
     DoubleBuy = "DoubleBuy"
-    StoppedFromLong = "StoppedFromLong"
-    StoppedFromShort = "StoppedFromShort"
+    StopFromLong = "StopFromLong"
+    StopFromShort = "StopFromShort"
+
+
+class PossibleOrderTypes:
+    Market = "market"
+    Limit = "limit"
 
 
 class Default:
@@ -73,7 +94,7 @@ class Default:
     stop_loss = ImplementedStopLosses.StopTrailing3T
     status = PossibleStatuses.NotRunning
     mode = PossibleModes.BackTesting
-    exchange = "Binance"
+    exchange = SupportedExchanges.binance
     quote_asset_symbol = "BTC"
     base_asset_symbol = "USDT"
     side = PossibleSides.Zeroed
@@ -92,10 +113,9 @@ kline_desired_informations = [
 ]  # , "Close_time"]
 
 
-# TODO: API key and secret from get os.environment ou default = None
-class Binance_:
-    api_key = None
-    api_secret = None
+class BinanceSettings:
+    api_key = GetEnvironment("binance_api_key", default=None)
+    api_secret = GetEnvironment("binance_api_secret", default=None)
     DateTimeFmt = 'timestamp'
     DateTimeUnit = 'milliseconds'
     _base_endpoint = "https://api.binance.com/api/v3/"
