@@ -7,24 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.1.0.dev] - 2020-06-05
+## [0.1.0-alpha.0] - 2020-10-02
+
+Starting point
 
 ### Added
 
-- Tempor ipsum proident Lorem nisi ipsum culpa aute esse amet.
+- Marketdata and tradingbot packages, with the respective classes,
+abstractions, modularizations, relationships, mappings and a few
+documentation
 
 ### Changed
 
-- Dolore qui amet fugiat exercitation voluptate nisi ipsum enim.
-
 ### Fixed
-
-- Et mollit aliquip in dolore aliquip eiusmod duis Lorem magna laborum pariatur.
 
 ### Removed
 
-- Ex nisi qui occaecat tempor incididunt cillum nisi elit voluptate cillum.
-
 ### Deprecated
 
-- Proident magna ad occaecat proident nisi elit laborum eiusmod sit est in labore.
