@@ -4,8 +4,15 @@
 
 Python, Pip, Poetry.
 
-To install [poetry](https://python-poetry.org/) with pip (supposing you
-have python and pip already installed):
+To install [poetry](https://python-poetry.org/docs/#installation), on
+osx, linux or *bashonwindows* terminals, type:
+
+  curl -sSL
+  <https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py>
+  | python -
+
+Alternatively, poetry could be installed by pip (supposing you have
+python and pip already installed):
 
     pip install poetry
 
