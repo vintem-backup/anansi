@@ -5,7 +5,7 @@
 Python, Pip, Poetry.
 
 To install [poetry](https://python-poetry.org/docs/#installation), on
-osx, linux or *bashonwindows* terminals, type:
+osx, linux or *bashonwindows* terminals, type it:
 
   curl -sSL
   <https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py>
