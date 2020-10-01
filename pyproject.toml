@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "anansi"
+name = "anansi_toolkit"
 version = "0.1.0"
 description = "A tool to analyze data and perform operations in markets"
 authors = ["Marcus Mello Vintem <marcus@vintem.tech>"]
