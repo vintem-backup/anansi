@@ -127,7 +127,7 @@ dataframe,
 with market indicator methods.
 
 ```python
-from anansi.marketdata.handlers import KlinesFromBroker
+from anansi_toolkit.marketdata.handlers import KlinesFromBroker
 ```
 
 ```python
@@ -595,7 +595,7 @@ the IP or even blocking API keys if some limits are exceeded. Use with
 caution.**
 
 ```python
-from anansi.marketdata import data_brokers
+from anansi_toolkit.marketdata import data_brokers
 ```
 
 ```python
