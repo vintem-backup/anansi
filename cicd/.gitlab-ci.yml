@@ -1,0 +1,11 @@
+image: python:alpine
+
+stages:
+    - test
+    - build
+    - delivery
+  
+
+run:
+  script:
+    - curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | python -
