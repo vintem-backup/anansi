@@ -30,9 +30,9 @@ Perform the commands:
 ### Importing Dependencies
 
 ```python
-from anansi.tradingbot.models import *
-from anansi.tradingbot import traders
-from anansi.tradingbot.views import create_user, create_default_operation
+from anansi_toolkit.tradingbot.models import *
+from anansi_toolkit.tradingbot import traders
+from anansi_toolkit.tradingbot.views import create_user, create_default_operation
 ```
 
 ### Add a new user
