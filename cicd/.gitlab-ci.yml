@@ -14,7 +14,7 @@ preparing_runner:
         libressl-dev \
         musl-dev \
         libffi-dev && \
-        pip install --no-cache-dir poetry && \
+        pip install --no-cache-dir poetry
     
     #- apk del \
     #    gcc \
