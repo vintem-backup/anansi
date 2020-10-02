@@ -1,33 +1,17 @@
-image: python:alpine
+image: python:3.7
 
 stages:
-  - preparing_runner
   - test
-  - build
-  - delivery
-  
-preparing_runner:
-  stage: preparing_runner
-  script:
-    - apk add --no-cache \
-        build-base \
-        libressl-dev \
-        musl-dev \
-        libffi-dev && \
-        pip install --no-cache-dir poetry
-    
-    #- apk del \
-    #    gcc \
-    #    libressl-dev \
-    #    musl-dev \
-    #    libffi-dev
+  - lint
+  - types
+  - deploy
 
-test:
+before_script:
+  - pip install poetry
+  - poetry config virtualenvs.create false
+  - poetry install
+
+Unit Tests:
   stage: test
   script:
     - poetry run pytest
-
-build:
-  stage: build  
-  script:
-    - poetry build
