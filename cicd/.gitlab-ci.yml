@@ -1,18 +1,22 @@
 image: python:alpine
 
 stages:
+  - preparing_runner
   - test
   - build
   - delivery
   
-before_script:
-  - apk add curl #\
-    #make \
-    #openssh \
-    #vim \
-    #py-pip \
-  - curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | python -
-  - poetry --version
+preparing_runner:
+  stage: preparing_runner
+  script:
+    - apk add curl #\
+      #make \
+      #openssh \
+      #vim \
+      #py-pip \
+    - curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | python -
+    - sudo restart
+    - poetry --version
 
 test:
   stage: test
