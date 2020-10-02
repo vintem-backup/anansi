@@ -15,7 +15,7 @@ preparing_runner:
       #vim \
       #py-pip \
     - curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | python -
-    - sudo restart
+    - reboot
     - poetry --version
 
 test:
