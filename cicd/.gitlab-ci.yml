@@ -9,14 +9,18 @@ stages:
 preparing_runner:
   stage: preparing_runner
   script:
-    - apk add curl #\
-      #make \
-      #openssh \
-      #vim \
-      #py-pip \
-    - curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | python -
-    - reboot
-    - poetry --version
+    - apk add --no-cache \
+        gcc \
+        libressl-dev \
+        musl-dev \
+        libffi-dev && \
+        pip install --no-cache-dir poetry && \
+    
+    #- apk del \
+    #    gcc \
+    #    libressl-dev \
+    #    musl-dev \
+    #    libffi-dev
 
 test:
   stage: test
