@@ -1,5 +1,7 @@
 # Anansi
 
+[![pipeline status](https://gitlab.com/marcusmello/anansi/badges/master/pipeline.svg)](https://gitlab.com/marcusmello/anansi/-/commits/master) [![coverage report](https://gitlab.com/marcusmello/anansi/badges/master/coverage.svg)](https://gitlab.com/marcusmello/anansi/-/commits/master)
+
 ## Dependencies
 
 Python, Pip, Poetry.
