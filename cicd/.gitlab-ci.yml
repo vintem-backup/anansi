@@ -14,8 +14,12 @@ before_script:
   - curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | python -
   - poetry --version
 
+test:
+  stage: test
+  script:
+    - poetry run pytest
+
 build:
-  stage: build
-  
-  run:
+  stage: build  
+  script:
     - poetry build
