@@ -4,7 +4,7 @@
 
 ## Dependencies
 
-Python, Pip, Poetry.
+Python, if you're using anansi installed by pip; if you're developing Pip, Poetry.
 
 To install [poetry](https://python-poetry.org/docs/#installation), on
 osx, linux or *bashonwindows* terminals, type it:
@@ -16,16 +16,45 @@ python and pip already installed):
 
     pip install poetry
 
+## How to install Anansi Toolkit
+
+Just type:
+
+    pip install anansi-toolkit
+
+or clone it from this repo and install it's dependencies by doing:
+    git clone gitlab.com/marcusmello/anansi
+    poetry install
+
 ## Consuming on Jupyter notebook
 
 **That is only a suggestion, you could run anansi on any python
 terminal. Only tested on linux.**
 
-Perform the commands:
+Install the anansi-toolkit kernel (virtual environment with all needed
+dependencies):
 
-    poetry install
     poetry run python -m ipykernel install --user --name=$(basename $(pwd))
+
+... or:
+    poetry run python -m ipykernel install --user --name=(basename (pwd))
+
+if you are a [fish](https://fishshell.com/ "command line shell interpreter")
+user.
+
+And, finally:
+
+    poetry run jupyter notebook
+
+or, if you want to release the prompt, do:
+
     poetry run jupyter notebook > jupyterlog 2>&1 &
+
+## Consuming on python terminal
+
+You must have to do this on a isolated environment, with dependencies embedded, doing:
+
+  poetry shell
 
 ## Straight to the point: Running Default Back Testing Operation
 
@@ -39,7 +68,7 @@ from anansi_toolkit.tradingbot.views import create_user, create_default_operatio
 
 ### Add a new user
 
-```python
+```py
 my_user_first_name = "John"
 
 create_user(first_name=my_user_first_name,
@@ -283,7 +312,7 @@ indicator = newest_klines.apply_indicator.trend.simple_moving_average(number_of_
 ```
 
 ```python
-indicator.name, indicator.last(), indicator.serie
+indicator.name, indicator.last(), indicator.series
 ```
 
     ('sma_ohlc4_35',
