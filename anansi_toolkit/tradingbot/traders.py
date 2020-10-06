@@ -1,15 +1,16 @@
+import time
+
 import pendulum
-from .models import DefaultLog
-from . import classifiers, stop_handlers, order_handler
+
 from ..marketdata.handlers import *
+from ..settings import PossibleModes as MODE
+from ..settings import PossibleOrderTypes as ORD
+from ..settings import PossibleSides as SIDE
+from ..settings import PossibleSignals as SIG
+from ..settings import PossibleStatuses as STAT
 from ..share.tools import *
-from ..settings import (
-    PossibleSides as SIDE,
-    PossibleStatuses as STAT,
-    PossibleModes as MODE,
-    PossibleSignals as SIG,
-    PossibleOrderTypes as ORD,
-)
+from . import classifiers, order_handler, stop_handlers
+from .models import DefaultLog
 
 
 class Order:
@@ -32,8 +33,8 @@ class DefaultTrader:
         self.log = DefaultLog(operation)
         self.result = None
         self.order = Order()
-        self.OrderHandler = (order_handler.OrderHandler(operation=operation,
-                                                        log=self.log))
+        self._order_handler()
+        #self.OrderHandler = None
 
         self.Classifier = getattr(classifiers, operation.classifier.name)(
             parameters=operation.classifier.parameters, log=self.log)
@@ -60,6 +61,11 @@ class DefaultTrader:
             self._final_backtesting_now = self._get_final_backtesting_now()
 
         self.OrderHandler._now = self._now  # Important if BackTesting mode
+    
+    def _order_handler(self):
+        self.OrderHandler = (
+            order_handler.OrderHandler(self.operation, self.log))
+
 
     def _get_initial_backtesting_now(self):
         self.Klines.time_frame = self.Classifier.parameters.time_frame
@@ -125,6 +131,7 @@ class DefaultTrader:
         self.result = Analyzer.get_result()
 
     def _start(self):
+        
         self.operation.update(status=STAT.Running)
 
         if self.operation.mode == MODE.BackTesting:
