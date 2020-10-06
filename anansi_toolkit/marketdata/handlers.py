@@ -86,7 +86,7 @@ class KlinesFromBroker:
             brokers, "{}DataBroker".format(broker_name.capitalize()))()
 
         self._time_frame = (time_frame if time_frame
-                            else "1m")  # self._broker.mininal_time_frame)
+                            else "1m")  # self._broker.minimal_time_frame)
         self._since = 1
         self._until = 2
 
@@ -267,4 +267,4 @@ class BackTestingPriceGetter:
         price = klines.apply_indicator.trend.simple_moving_average(
             number_of_candles=5,
             metrics="ohlc4")
-        return float(price.serie.mean())
+        return float(price.series.mean())
