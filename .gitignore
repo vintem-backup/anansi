@@ -8,6 +8,7 @@ jupyterlog
 *.ipynb
 dev*
 issue_comment.md
+.idea/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
