@@ -3,18 +3,19 @@ import time
 import pendulum
 
 from ..marketdata.handlers import *
-from ..settings import PossibleModes as MODE
-from ..settings import PossibleOrderTypes as ORD
-from ..settings import PossibleSides as SIDE
-from ..settings import PossibleSignals as SIG
-from ..settings import PossibleStatuses as STAT
+
+from ..settings import (
+    PossibleModes as MODE,
+    PossibleOrderTypes as ORD,
+    PossibleSides as SIDE,
+    PossibleStatuses as STAT)
+
 from ..share.tools import *
 from . import classifiers, order_handler, stop_handlers
 from .models import DefaultLog
 
 
 class Order:
-    # def __init__(self):
     signal: str = SIG.Hold
     to_side: str = None
     order_type = ORD.Market
