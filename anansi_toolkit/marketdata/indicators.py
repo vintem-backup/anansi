@@ -28,14 +28,14 @@ _columns = {
 
 
 class Indicator(object):
-    __slots__ = ["name", "serie"]
+    __slots__ = ["name", "series"]
 
-    def __init__(self, name="", serie=pd.core.series.Series(dtype=float)):
+    def __init__(self, name="", _series=pd.core.series.series(dtype=float)):
         self.name = name
-        self.serie = serie
+        self._series = _series
 
     def last(self) -> float:
-        return self.serie.tail(1).item()
+        return self.series.tail(1).item()
 
 
 @pd.api.extensions.register_dataframe_accessor("PriceFromKline")
@@ -50,11 +50,11 @@ class PriceFromKline:
 
         indicator = Indicator(
             name="price_{}".format(metrics),
-            serie=(self._klines[_columns[metrics]]).mean(
+            series=(self._klines[_columns[metrics]]).mean(
                 axis=1))
 
         if indicator_column:
-            self._klines.loc[:, indicator_column] = indicator.serie
+            self._klines.loc[:, indicator_column] = indicator.series
         return indicator
 
 
@@ -71,11 +71,11 @@ class Trend:
 
         indicator = Indicator(
             name="sma_{}_{}".format(metrics, str(number_of_candles)),
-            serie=(self._klines.PriceFromKline.using(metrics))
-            .serie.rolling(window=number_of_candles).mean())
+            series=(self._klines.PriceFromKline.using(metrics))
+            .series.rolling(window=number_of_candles).mean())
 
         if indicator_column:
-            self._klines.loc[:, indicator_column] = indicator.serie
+            self._klines.loc[:, indicator_column] = indicator.series
         return indicator
 
 
