@@ -1,10 +1,8 @@
-# import pandas as pd
 import json
 import pendulum
-from pony.orm import *
-from ..settings import *
+from pony.orm import commit, Database, Json, Optional, Required, Set, sql_debug
+from ..settings import Default, Environments, kline_desired_informations
 from ..share.tools import DefaultPrintLog
-from ..share.db_handlers import Storage
 
 db, env = Database(), Environments.ENV
 
@@ -57,7 +55,8 @@ class StopLoss(db.Entity, AttributeUpdater):
     parameters = Optional(Json)
 
 
-class Market(db.Entity):  # I's not advise make below attributes editable.
+# I's not advise to make editable the attributes below.
+class Market(db.Entity):
     operation = Optional(lambda: Operation)  # Foreing key
     exchange = Required(str, default=Default.exchange)
     quote_asset_symbol = Required(str, default=Default.quote_asset_symbol)
@@ -106,16 +105,19 @@ class DefaultLog(DefaultPrintLog):
         self.operation = operation
 
         self.desired_analyzed_data_information = (
-            kline_desired_informations if not
-            desired_analyzed_data_information
-            else desired_analyzed_data_information)
+            kline_desired_informations
+            if not desired_analyzed_data_information
+            else desired_analyzed_data_information
+        )
 
         self.append_log_to_database = getattr(
-            self, "_{}LogAppend".format(operation.mode))
+            self, "_{}log_append".format((operation.mode).lower())
+        )
 
-        self._reset_collections()
+        self._reset()
 
-    def _reset_collections(self):
+    def _reset(self):
+        self.analyzed_by = None
         self.last_analyzed_data = dict()
         self.analysis_result = dict()
         self.order = dict()
@@ -127,36 +129,40 @@ class DefaultLog(DefaultPrintLog):
         self.events_on_a_cycle = json.dumps(self.events_on_a_cycle)
         self.order = json.dumps(self.order)
 
-    def _CreateOperationLog(self, **kwargs):
+    def _create_operational_log(self, **kwargs):
         self.operation.logs.create(
-            **kwargs, claimed_at=pendulum.now().int_timestamp)
+            **kwargs, claimed_at=pendulum.now().int_timestamp
+        )
         commit()
-        self._reset_collections()
+        self._reset()
 
-    def _BackTestingLogAppend(self):
-
+    def _backtesting_log_append(self):
         kwargs = dict(
             analyzed_by=self.analyzed_by,
             last_analyzed_data=self.last_analyzed_data,
             analysis_result=self.analysis_result,
-            events=self.events_on_a_cycle)
+            events=self.events_on_a_cycle,
+        )
+        self._create_operational_log(**kwargs)
 
-        self._CreateOperationLog(**kwargs)
-
-    def _RealTradingLogAppend(self):
+    def _real_trading_log_append(self):
         pass
 
-    def _RealTimeTestLogappend(self):
+    def _real_time_test_log_append(self):
+        pass
+
+    def _advisor_log_append(self):
         pass
 
     def report(self, event):
         event_key = "{}_{}".format(
-            str(event.reporter),
-            str(pendulum.now().int_timestamp))
+            str(event.reporter), str(pendulum.now().int_timestamp)
+        )
 
         self.events_on_a_cycle = {
             **self.events_on_a_cycle,
-            event_key: event.description}
+            event_key: event.description,
+        }
 
     def update(self):
         if env.print_log:
@@ -174,24 +180,5 @@ class TradeLog(db.Entity, AttributeUpdater):
     price = Optional(float)
     fee = Optional(float)  # base_asset units
     base_amount = Optional(float)
-
-
-class TradesRegister:
-    def __init__(self, operation):
-        self.operation = operation
-        self.storage = Storage(
-            db_name=env._DbPath,
-            table_name="operation_id_{}_trades".format(self.operation.id),
-            primary_key="timestamp")
-
-        self.timestamp = None
-        self.signal = None
-        self.base_asset_amount = None
-        self.price = None
-        self.fee = None  # base_asset units
-
-    def save_trade(self):
-        pass
-
 
 db.generate_mapping(create_tables=True)
