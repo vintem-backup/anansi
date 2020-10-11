@@ -5,16 +5,16 @@ from ..settings import Default
 from ..share.tools import Serialize
 
 
-def parameters_for(analyzer):
+def default_parameters_for(analyzer):
     return Serialize(analyzer.DefaultParameters()).to_json()
 
 
 def DefaultClassifierParameters():
-    return parameters_for(getattr(classifiers, Default.classifier))
+    return default_parameters_for(getattr(classifiers, Default.classifier))
 
 
 def DefaultStopLossParameters():
-    return parameters_for(getattr(stop_handlers, Default.stop_loss))
+    return default_parameters_for(getattr(stop_handlers, Default.stop_loss))
 
 
 @db_session
