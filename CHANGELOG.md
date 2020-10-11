@@ -24,7 +24,7 @@ Starting point, see [release note](https://gitlab.com/marcusmello/anansi/-/relea
 ### Added
 
 - Marketdata and tradingbot packages, with the respective classes,
-abstractions, modularizations, relationships, mappings and a few
+abstractions, modularization, relationships, mappings and a few
 documentation
 
 ### Changed
