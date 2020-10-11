@@ -43,7 +43,7 @@ class SupportedExchanges:
 
 
 class ImplementedTraders:
-    DefaultTrader = "DefaultTrader"
+    KlinesSimpleTrader = "KlinesSimpleTrader"
 
 
 class ImplementedClassifiers:
@@ -89,7 +89,7 @@ class PossibleOrderTypes:
 
 
 class Default:
-    trader = ImplementedTraders.DefaultTrader
+    trader = ImplementedTraders.KlinesSimpleTrader
     classifier = ImplementedClassifiers.CrossSMA
     stop_loss = ImplementedStopLosses.StopTrailing3T
     status = PossibleStatuses.NotRunning
