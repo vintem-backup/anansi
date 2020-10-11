@@ -44,10 +44,8 @@ class CrossSMA:
 
         result.side = (
             SIDE.Long if result.SMA_smaller > result.SMA_larger
-            else SIDE.Short)
+            else SIDE.Zeroed)
         
         data.KlinesDateTime.from_human_readable_to_timestamp()
-        
         self._append_to_log(data[-1:], result)
-
         return result
