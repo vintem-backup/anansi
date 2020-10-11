@@ -35,27 +35,17 @@ class DefaultTrader:
         self.result = None
         self.order = Order()
         self._order_handler()
-        #self.OrderHandler = None
 
         self.Classifier = getattr(classifiers, operation.classifier.name)(
             parameters=operation.classifier.parameters, log=self.log)
 
-        self._classifier_time_frame_in_seconds = seconds_in(
-            self.Classifier.parameters.time_frame)
-
         self.StopLoss = getattr(stop_handlers, operation.stop_loss.name)(
             parameters=operation.stop_loss.parameters, log=self.log)
-
-        self._stop_loss_time_frame_in_seconds = seconds_in(
-            self.StopLoss.parameters.time_frame)
-
-        self.Klines = KlinesFromBroker(
-            operation.market.exchange, ticker_symbol)
 
         self._now = pendulum.now().int_timestamp
 
         if self.operation.mode == MODE.BackTesting:
-            self.Klines = BackTestingKlines(
+            self.KlinesGetter = BackTestingKlines(
                 operation.market.exchange, ticker_symbol)
 
             self._now = self._get_initial_backtesting_now()
@@ -69,16 +59,16 @@ class DefaultTrader:
 
 
     def _get_initial_backtesting_now(self):
-        self.Klines.time_frame = self.Classifier.parameters.time_frame
+        self.KlinesGetter.time_frame = self.Classifier.parameters.time_frame
 
-        step_in_seconds = (self._classifier_time_frame_in_seconds *
-                           self.Classifier.n_samples_to_analyze)
+        step_in_seconds = (self.Classifier.step *
+                           self.Classifier.number_of_candles)
 
-        return self.Klines._oldest_open_time() + step_in_seconds
+        return self.KlinesGetter._oldest_open_time() + step_in_seconds
 
     def _get_final_backtesting_now(self):
-        self.Klines.time_frame = self.Classifier.parameters.time_frame
-        return self.Klines._newest_open_time()
+        self.KlinesGetter.time_frame = self.Classifier.parameters.time_frame
+        return self.KlinesGetter._newest_open_time()
 
     def _get_ready_to_repeat(self):
         if self.operation.mode == MODE.BackTesting:
@@ -94,14 +84,18 @@ class DefaultTrader:
             time.sleep(sleep_time)
             self._now = pendulum.now().int_timestamp
 
+            time.sleep(2)
+
+
+
     def _do_analysis(self):
-        self._step = self._classifier_time_frame_in_seconds
+        self._step = self.Classifier.step
         CheckStop = self.operation.stop_is_on
         IsPositioned = bool(
             self.operation.position.side != SIDE.Zeroed)
 
         if IsPositioned and CheckStop:
-            self._step = self._stop_loss_time_frame_in_seconds
+            self._step = self.StopLoss.step
             self._stop_analysis()
 
         self._classifier_analysis()
@@ -113,7 +107,7 @@ class DefaultTrader:
         NewDataToAnalyze = bool(
             self._now >= (
                 self.operation.last_check.by_classifier_at +
-                self._classifier_time_frame_in_seconds))
+                self.Classifier.step))
 
         if NewDataToAnalyze:
             self._analyze_for(self.Classifier)
@@ -123,15 +117,18 @@ class DefaultTrader:
             print("No new data do analyze")
 
     def _analyze_for(self, Analyzer):
-        self.Klines.time_frame = Analyzer.parameters.time_frame
+        self.KlinesGetter.time_frame = Analyzer.parameters.time_frame
 
-        Analyzer.data_to_analyze = self.Klines.get(
-            number_of_candles=Analyzer.n_samples_to_analyze,
+        data = self.KlinesGetter.get(
+            number_of_candles=Analyzer.number_of_candles,
             until=self._now)
 
-        self.result = Analyzer.get_result()
+        self.result = Analyzer.get_result_for_this(data)
 
     def _start(self):
+        
+        self.KlinesGetter = KlinesFromBroker(
+            operation.market.exchange, ticker_symbol)
         
         self.operation.update(status=STAT.Running)
 
@@ -144,7 +141,7 @@ class DefaultTrader:
         self.log.report(self.event)
 
     def _prepare_order(self):
-        self.order.price = self.result.price
+        self.order.price = 9000.0 #! Just a mock
 
         signal = get_signal(
             from_side=self.operation.position.side,
