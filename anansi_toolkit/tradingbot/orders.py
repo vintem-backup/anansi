@@ -8,7 +8,7 @@ from ..settings import (PossibleSides as SIDE, PossibleModes as MODE,
 from ..share.tools import Serialize, EventContainer
 
 
-class OrderHandler:
+class Handler:
     def __init__(self, operation, log):
         self.quote_key = "{}".format(operation.market.quote_asset_symbol)
         self.base_key = "{}".format(operation.market.base_asset_symbol)
