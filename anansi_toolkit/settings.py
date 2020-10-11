@@ -1,6 +1,6 @@
 import os
 
-
+# TODO: Change to environs
 def GetEnvironment(var_name, default):
     try:
         return os.environ[var_name]
@@ -43,7 +43,7 @@ class SupportedExchanges:
 
 
 class ImplementedTraders:
-    KlinesSimpleTrader = "KlinesSimpleTrader"
+    SimpleKlinesTrader = "SimpleKlinesTrader"
 
 
 class ImplementedClassifiers:
@@ -89,7 +89,7 @@ class PossibleOrderTypes:
 
 
 class Default:
-    trader = ImplementedTraders.KlinesSimpleTrader
+    trader = ImplementedTraders.SimpleKlinesTrader
     classifier = ImplementedClassifiers.CrossSMA
     stop_loss = ImplementedStopLosses.StopTrailing3T
     status = PossibleStatuses.NotRunning
