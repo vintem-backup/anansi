@@ -1,68 +1,66 @@
 import time
-
 import pendulum
-
 from ..marketdata import handlers
+from ..share import tools
+from . import classifiers, orders
+from .models import DefaultLog
 
 from ..settings import (
     PossibleModes as MODE,
     PossibleOrderTypes as ORD,
     PossibleSides as SIDE,
-    PossibleStatuses as STAT)
-
-from ..share.tools import *
-from . import classifiers, order_handler, stop_handlers
-from .models import DefaultLog
+    PossibleStatuses as STAT,
+)
 
 
 class Order:
-    signal: str = SIG.Hold
+    from_side: str = None
     to_side: str = None
     order_type = ORD.Market
-    amount: float = None
     price: float = None
 
 
 class KlinesSimpleTrader:
     def __init__(self, operation):
-        ticker_symbol = (operation.market.quote_asset_symbol
-                         + operation.market.base_asset_symbol)
-
-        self._step = None #! necessário?
+        ticker_symbol = (
+            operation.market.quote_asset_symbol
+            + operation.market.base_asset_symbol
+        )
+        
+        self._step = None  #! necessário?
         self.operation = operation
-        self.event = EventContainer(reporter=self.__class__.__name__)
+        self.event = tools.EventContainer(reporter=self.__class__.__name__)
         self.log = DefaultLog(operation)
         self.result = None
         self.order = Order()
-        self._order_handler()
+        
+        self.OrderHandler = orders.Handler(self.operation, self.log)
 
         self.Classifier = getattr(classifiers, operation.classifier.name)(
-            parameters=operation.classifier.parameters, log=self.log)
+            parameters=operation.classifier.parameters, log=self.log
+        )
 
-        self.StopLoss = getattr(stop_handlers, operation.stop_loss.name)(
-            parameters=operation.stop_loss.parameters, log=self.log)
 
-        self._now = pendulum.now().int_timestamp
+        
 
         if self.operation.mode == MODE.BackTesting:
-            self.KlinesGetter = BackTestingKlines(
-                operation.market.exchange, ticker_symbol)
+            self.KlinesGetter = handlers.BackTestingKlines(
+                operation.market.exchange, ticker_symbol
+            )
 
             self._now = self._get_initial_backtesting_now()
             self._final_backtesting_now = self._get_final_backtesting_now()
 
-        self.OrderHandler._now = self._now  # Important if BackTesting mode
-    
-    def _order_handler(self):
-        self.OrderHandler = (
-            order_handler.OrderHandler(self.operation, self.log))
 
+    def _order_handler(self):
+        
 
     def _get_initial_backtesting_now(self):
         self.KlinesGetter.time_frame = self.Classifier.parameters.time_frame
 
-        step_in_seconds = (self.Classifier.step *
-                           self.Classifier.number_of_candles)
+        step_in_seconds = (
+            self.Classifier.step * self.Classifier.number_of_candles
+        )
 
         return self.KlinesGetter._oldest_open_time() + step_in_seconds
 
@@ -70,6 +68,27 @@ class KlinesSimpleTrader:
         self.KlinesGetter.time_frame = self.Classifier.parameters.time_frame
         return self.KlinesGetter._newest_open_time()
 
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     def _get_ready_to_repeat(self):
         if self.operation.mode == MODE.BackTesting:
             self._now += self._step
@@ -78,8 +97,7 @@ class KlinesSimpleTrader:
             if self._now > self._final_backtesting_now:
                 self.operation.status = STAT.NotRunning
         else:
-            sleep_time = (self._step
-                          - pendulum.from_timestamp(self._now).second)
+            sleep_time = self._step - pendulum.from_timestamp(self._now).second
 
             time.sleep(sleep_time)
             self._now = pendulum.now().int_timestamp
@@ -87,8 +105,7 @@ class KlinesSimpleTrader:
     def _do_analysis(self):
         self._step = self.Classifier.step
         CheckStop = self.operation.stop_is_on
-        IsPositioned = bool(
-            self.operation.position.side != SIDE.Zeroed)
+        IsPositioned = bool(self.operation.position.side != SIDE.Zeroed)
 
         if IsPositioned and CheckStop:
             self._step = self.StopLoss.step
@@ -101,9 +118,12 @@ class KlinesSimpleTrader:
 
     def _classifier_analysis(self):
         NewDataToAnalyze = bool(
-            self._now >= (
-                self.operation.last_check.by_classifier_at +
-                self.Classifier.step))
+            self._now
+            >= (
+                self.operation.last_check.by_classifier_at
+                + self.Classifier.step
+            )
+        )
 
         if NewDataToAnalyze:
             self._analyze_for(self.Classifier)
@@ -116,16 +136,18 @@ class KlinesSimpleTrader:
         self.KlinesGetter.time_frame = Analyzer.parameters.time_frame
 
         data = self.KlinesGetter.get(
-            number_of_candles=Analyzer.number_of_candles,
-            until=self._now)
+            number_of_candles=Analyzer.number_of_candles, until=self._now
+        )
 
         self.result = Analyzer.get_result_for_this(data)
 
     def _start(self):
-        
+        self._now = pendulum.now().int_timestamp
+
         self.KlinesGetter = KlinesFromBroker(
-            operation.market.exchange, ticker_symbol)
-        
+            operation.market.exchange, ticker_symbol
+        )
+
         self.operation.update(status=STAT.Running)
 
         if self.operation.mode == MODE.BackTesting:
@@ -137,12 +159,13 @@ class KlinesSimpleTrader:
         self.log.report(self.event)
 
     def _prepare_order(self):
-        self.order.price = 9000.0 #! Just a mock
+        self.order.price = 9000.0  #! Just a mock
 
         signal = get_signal(
             from_side=self.operation.position.side,
             to_side=self.result.side,
-            by_stop=self.result.by_stop)
+            by_stop=self.result.by_stop,
+        )
 
         self.event.description = "Original signal: {}".format(signal)
         self.log.report(self.event)
@@ -151,14 +174,17 @@ class KlinesSimpleTrader:
 
         if HoldIfRecentlyStopped:
             StoppedFromLong = bool(
-                self.operation.position.due_to_signal == SIG.StopFromLong)
+                self.operation.position.due_to_signal == SIG.StopFromLong
+            )
 
             StoppedFromShort = bool(
-                self.operation.position.due_to_signal == SIG.StopFromShort)
+                self.operation.position.due_to_signal == SIG.StopFromShort
+            )
 
             IgnoreSignalDueToStop = bool(
-                (signal == SIG.Buy and StoppedFromLong) or
-                (signal == SIG.Sell and StoppedFromShort))
+                (signal == SIG.Buy and StoppedFromLong)
+                or (signal == SIG.Sell and StoppedFromShort)
+            )
 
             if IgnoreSignalDueToStop:
                 signal = SIG.StopByPassed
