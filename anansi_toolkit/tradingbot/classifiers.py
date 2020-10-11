@@ -1,10 +1,11 @@
-from ..settings import PossibleSides as Side
+from ..settings import PossibleSides as SIDE
 import json
-from ..share.tools import Serialize, Deserialize
+from ..share.tools import Serialize, Deserialize, seconds_in
 deserialize = Deserialize()
 
 
 class Result:
+    side = SIDE.Zeroed
     by_stop = False
 
 
@@ -15,42 +16,38 @@ class CrossSMA:
             self.price_metrics = "ohlc4"
             self.smaller_sample = 3
             self.larger_sample = 80
-
-    def __init__(self, parameters, log, data_to_analyze=None):
+    
+    def __init__(self, parameters, log):
         self.parameters = deserialize.from_json(parameters)
         self.log = log
-        self.data_to_analyze = data_to_analyze
-        self.n_samples_to_analyze = self.parameters.larger_sample
-        self.result = Result()
+        self.analyzed_data = None
+        self.number_of_candles = self.parameters.larger_sample
+        self.step = seconds_in(self.parameters.time_frame)
 
-    def _log_it(self):
-        _last_analyzed_data = self.data_to_analyze[-1:]
-        _last_analyzed_data.KlinesDateTime.from_human_readable_to_timestamp()
-
-        self.log.analysis_result = Serialize(self.result).to_dict()
+    def _append_to_log(self, data, result):
         self.log.analyzed_by = self.__class__.__name__
-        self.log.last_analyzed_data = (
-            _last_analyzed_data.to_dict(orient="records")[0])
+        self.log.analysis_result = Serialize(result).to_dict()
+        self.log.last_analyzed_data = (data.to_dict(orient="records")[0])
 
-    def get_result(self):
-        self.result.side = Side.Short
+    def get_result_for_this(self, data):
+        result = Result()
 
-        self.result.price = self.data_to_analyze.PriceFromKline.using(
-            self.parameters.price_metrics).last()
-
-        self.result.SMA_smaller = (
-            self.data_to_analyze.apply_indicator.trend.simple_moving_average(
+        result.SMA_smaller = (
+            data.apply_indicator.trend.simple_moving_average(
                 number_of_candles=self.parameters.smaller_sample,
                 metrics=self.parameters.price_metrics)).last()
 
-        self.result.SMA_larger = (
-            self.data_to_analyze.apply_indicator.trend.simple_moving_average(
+        result.SMA_larger = (
+            data.apply_indicator.trend.simple_moving_average(
                 number_of_candles=self.parameters.larger_sample,
                 metrics=self.parameters.price_metrics)).last()
 
-        if self.result.SMA_smaller > self.result.SMA_larger:
-            self.result.side = Side.Long
+        result.side = (
+            SIDE.Long if result.SMA_smaller > result.SMA_larger
+            else SIDE.Short)
+        
+        data.KlinesDateTime.from_human_readable_to_timestamp()
+        
+        self._append_to_log(data[-1:], result)
 
-        self._log_it()
-
-        return self.result
+        return result
