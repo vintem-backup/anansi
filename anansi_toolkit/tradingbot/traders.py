@@ -2,7 +2,7 @@ import time
 
 import pendulum
 
-from ..marketdata.handlers import *
+from ..marketdata import handlers
 
 from ..settings import (
     PossibleModes as MODE,
@@ -23,12 +23,12 @@ class Order:
     price: float = None
 
 
-class DefaultTrader:
+class KlinesSimpleTrader:
     def __init__(self, operation):
         ticker_symbol = (operation.market.quote_asset_symbol
                          + operation.market.base_asset_symbol)
 
-        self._step = None
+        self._step = None #! necessário?
         self.operation = operation
         self.event = EventContainer(reporter=self.__class__.__name__)
         self.log = DefaultLog(operation)
@@ -83,10 +83,6 @@ class DefaultTrader:
 
             time.sleep(sleep_time)
             self._now = pendulum.now().int_timestamp
-
-            time.sleep(2)
-
-
 
     def _do_analysis(self):
         self._step = self.Classifier.step
