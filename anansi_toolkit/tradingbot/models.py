@@ -1,15 +1,24 @@
-import json
-import pendulum
-from pony.orm import commit, Database, Json, Optional, Required, Set, sql_debug
 from ..settings import Default, Environments, kline_desired_informations
 from ..share.tools import DefaultPrintLog
+import json
+import pendulum
+from pony.orm import (
+    Database,
+    Json,
+    Optional,
+    Required,
+    Set,
+    StrArray,
+    commit,
+    sql_debug,
+)
 
 db, env = Database(), Environments.ENV
 
 db.bind(**env.ORM_bind_to)
 sql_debug(env.SqlDebug)
 
-
+# Common extension ('MixIn') for a several models
 class AttributeUpdater(object):
     def update(self, **kwargs):
         for item in kwargs.items():
@@ -17,28 +26,23 @@ class AttributeUpdater(object):
             commit()
 
 
+# Database models
 class User(db.Entity, AttributeUpdater):
     first_name = Required(str, unique=True)
     last_name = Optional(str)
     email = Optional(str)
     operations = Set(lambda: Operation, cascade_delete=True)
-    portfolio = Required(lambda: Portfolio, cascade_delete=True)
-    trades_log = Set(lambda: TradeLog, cascade_delete=False)
 
     @property
     def login_displayed_name(self):
         return "{}_{}".format(self.first_name, self.last_name)
 
 
-class Portfolio(db.Entity, AttributeUpdater):
-    user = Optional(User)  # Foreing key
-    assets = Optional(Json)
-
-
 class Position(db.Entity, AttributeUpdater):
     operation = Optional(lambda: Operation)  # Foreing key
     side = Required(str, default=Default.side)
-    size_by_quote = Optional(float)
+    initial_assets = Required(Json, default=json.dumps(Default.initial_assets))
+    current_assets = Required(Json, default=json.dumps(Default.initial_assets))
     due_to_signal = Optional(str)
     exit_reference_price = Optional(float)
 
@@ -55,8 +59,8 @@ class StopLoss(db.Entity, AttributeUpdater):
     parameters = Optional(Json)
 
 
-# I's not advise to make editable the attributes below.
 class Market(db.Entity):
+    ## It is not advisable to make the attributes below editable.
     operation = Optional(lambda: Operation)  # Foreing key
     exchange = Required(str, default=Default.exchange)
     quote_asset_symbol = Required(str, default=Default.quote_asset_symbol)
@@ -74,25 +78,25 @@ class Operation(db.Entity, AttributeUpdater):
     trader = Required(str, default=Default.trader)
     position = Required(Position, cascade_delete=True)
     market = Required(Market, cascade_delete=True)
-    # Leverage or portfolio proportion:
-    exposure_factor = Required(float, default=1.0)
     classifier = Required(Classifier, cascade_delete=True)
     stop_loss = Required(StopLoss, cascade_delete=True)
-    logs = Set(lambda: OperationLog)
 
-    status = Required(str, default=Default.status)
     mode = Required(str, default=Default.mode)
-    stop_is_on = Required(bool, default=False)
-    hold_if_stopped = Required(bool, default=True)
-
+    is_stop_loss_enabled = Required(bool, default=False)
+    allowed_special_signals = Required(
+        StrArray, default=Default.allowed_special_signals
+    )
+    status = Required(str, default=Default.status)
     last_check = Required(LastCheck)
+    operational_log = Set(lambda: OperationalLog, cascade_delete=False)
+    trades_log = Set(lambda: TradeLog, cascade_delete=False)
 
 
-class OperationLog(db.Entity):
+class OperationalLog(db.Entity):
     # Present in all logs:
     operation = Optional(Operation)  # Foreing key
-    claimed_at = Optional(int)  # UTC timestamp
-    # Optional on each log:
+    timestamp = Optional(int)  # UTC
+    # Optional for each log:
     analyzed_by = Optional(str)
     last_analyzed_data = Optional(Json)
     analysis_result = Optional(Json)
@@ -100,38 +104,67 @@ class OperationLog(db.Entity):
     events = Optional(Json)
 
 
+class TradeLog(db.Entity, AttributeUpdater):
+    operation = Optional(Operation)  # Foreing key
+    timestamp = Optional(int)  # UTC
+    signal = Optional(str)
+    price = Optional(float)
+    fee = Optional(float)  # base_asset units
+    quote_amount = Optional(float)  # no discount due to fees
+
+
+db.generate_mapping(create_tables=True)
+
+
+
+# Specific database models handlers
+
+
 class DefaultLog(DefaultPrintLog):
-    def __init__(self, operation, desired_analyzed_data_information=None):
+    """ TODO: Testar injetar esta classe como MixIn em 'OperationLog'.
+    TODO: Não mais herdar de 'DefaultPrintLog'. A incumbência de formarmatar
+    e imprimir a mensagem de log deve ser do trader, que conhece o
+    formato do dado.
+    """
+    log_dicts = [
+        "last_analyzed_data",
+        "analysis_result",
+        "order",
+        "events_on_a_cycle",
+    ]
+
+    def __init__(self, operation):
         self.operation = operation
-
-        self.desired_analyzed_data_information = (
-            kline_desired_informations
-            if not desired_analyzed_data_information
-            else desired_analyzed_data_information
-        )
-
         self.append_log_to_database = getattr(
-            self, "_{}log_append".format((operation.mode).lower())
+            self, "_{}_log_append".format((operation.mode).lower())
         )
-
         self._reset()
 
     def _reset(self):
-        self.analyzed_by = None
-        self.last_analyzed_data = dict()
-        self.analysis_result = dict()
-        self.order = dict()
-        self.events_on_a_cycle = dict()
+        self._timestamp = 0
+        self.analyzed_by = ""
+        for attribute_name in self.log_dicts:
+            setattr(self, attribute_name, dict())
 
-    def _data_dicts_to_json(self):
-        self.last_analyzed_data = json.dumps(self.last_analyzed_data)
-        self.analysis_result = json.dumps(self.analysis_result)
-        self.events_on_a_cycle = json.dumps(self.events_on_a_cycle)
-        self.order = json.dumps(self.order)
+        # self.last_analyzed_data = dict()
+        # self.analysis_result = dict()
+        # self.order = dict()
+        # self.events_on_a_cycle = dict()
+
+    def _log_dicts_to_json(self):
+        for attribute_name in self.log_dicts:
+            attribute = getattr(self, attribute_name)
+            attribute_value = json.dumps(attribute)
+            setattr(self, attribute_name, attribute_value)
+
+        # self.last_analyzed_data = json.dumps(self.last_analyzed_data)
+        # self.analysis_result = json.dumps(self.analysis_result)
+        # self.events_on_a_cycle = json.dumps(self.events_on_a_cycle)
+        # self.order = json.dumps(self.order)
 
     def _create_operational_log(self, **kwargs):
-        self.operation.logs.create(
-            **kwargs, claimed_at=pendulum.now().int_timestamp
+        self.operation.operational_log.create(
+            **kwargs, timestamp=self._timestamp
         )
         commit()
         self._reset()
@@ -158,27 +191,17 @@ class DefaultLog(DefaultPrintLog):
         event_key = "{}_{}".format(
             str(event.reporter), str(pendulum.now().int_timestamp)
         )
-
         self.events_on_a_cycle = {
             **self.events_on_a_cycle,
             event_key: event.description,
         }
 
-    def update(self):
+    def update(self, timestamp: int = None):
+        self._timestamp = (
+            pendulum.now().int_timestamp if not timestamp else timestamp
+        )
         if env.print_log:
             self.print_log()
 
-        self._data_dicts_to_json()
+        self._log_dicts_to_json()
         self.append_log_to_database()
-
-
-class TradeLog(db.Entity, AttributeUpdater):
-    user = Optional(User)  # Foreing key
-    operation_id = Optional(int)
-    timestamp = Optional(int)
-    signal = Optional(str)
-    price = Optional(float)
-    fee = Optional(float)  # base_asset units
-    base_amount = Optional(float)
-
-db.generate_mapping(create_tables=True)
