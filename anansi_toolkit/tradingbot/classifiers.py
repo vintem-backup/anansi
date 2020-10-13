@@ -6,7 +6,7 @@ deserialize = Deserialize()
 
 class Result:
     side = SIDE.Zeroed
-    by_stop = False
+    due_to_stop = False
 
 
 class CrossSMA:
