@@ -8,9 +8,7 @@ def GetEnvironment(var_name, default):
         try:
             return default
         except KeyError:
-            error_msg = 'Set the {} environment variable'.format(var_name)
-            raise ImproperlyConfigured(error_msg)
-
+            pass
 
 AUTO_START = GetEnvironment("AUTO_START", default=False)
 
@@ -60,6 +58,7 @@ class PossibleStatuses:
 
 
 class PossibleModes:
+    Advisor = "Advisor"
     BackTesting = "BackTesting"
     RealTrading = "RealTrading"
     RealTimeTest = "RealTimeTest"
@@ -72,12 +71,12 @@ class PossibleSides:
 
 
 class PossibleSignals:
-    StopByPassed = "StopByPassed"
+    SkippedDueToStopLoss = "SkippedDueToStopLoss"
     Hold = "Hold"
     Buy = "Buy"
     Sell = "Sell"
     NakedSell = "NakedSell"
-    DoubleNakedSell = "DoubleNakedSell"
+    DoubleSell = "DoubleSell"
     DoubleBuy = "DoubleBuy"
     StopFromLong = "StopFromLong"
     StopFromShort = "StopFromShort"
@@ -101,7 +100,9 @@ class Default:
     initial_assets = {
         'BTC': 0.0,
         'USDT': 100.00}
-
+    # NakedSell, DoubleBuy and DoubleSell, if allowed, must be declared below;
+    # example: [PossibleSignals.NakedSell, ...]
+    allowed_special_signals = []
 
 kline_desired_informations = [
     "Open_time",
