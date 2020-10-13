@@ -126,12 +126,6 @@ class DefaultLog(DefaultPrintLog):
     e imprimir a mensagem de log deve ser do trader, que conhece o
     formato do dado.
     """
-    log_dicts = [
-        "last_analyzed_data",
-        "analysis_result",
-        "order",
-        "events_on_a_cycle",
-    ]
 
     def __init__(self, operation):
         self.operation = operation
@@ -143,14 +137,16 @@ class DefaultLog(DefaultPrintLog):
     def _reset(self):
         self._timestamp = 0
         self.analyzed_by = ""
-        for attribute_name in self.log_dicts:
-            setattr(self, attribute_name, dict())
+        self.last_analyzed_data = dict()
+        self.analysis_result = dict()
+        self.order = dict()
+        self.events_on_a_cycle = dict()
 
     def _log_dicts_to_json(self):
-        for attribute_name in self.log_dicts:
-            attribute = getattr(self, attribute_name)
-            attribute_value = json.dumps(attribute)
-            setattr(self, attribute_name, attribute_value)
+        self.last_analyzed_data = json.dumps(self.last_analyzed_data)
+        self.analysis_result = json.dumps(self.analysis_result)
+        self.events_on_a_cycle = json.dumps(self.events_on_a_cycle)
+        self.order = json.dumps(self.order)
 
     def _create_operational_log(self, **kwargs):
         self.operation.operational_log.create(
@@ -164,6 +160,7 @@ class DefaultLog(DefaultPrintLog):
             analyzed_by=self.analyzed_by,
             last_analyzed_data=self.last_analyzed_data,
             analysis_result=self.analysis_result,
+            order=self.order,
             events=self.events_on_a_cycle,
         )
         self._create_operational_log(**kwargs)
