@@ -1,6 +1,15 @@
+from pony.orm import db_session
 import json
 from . import classifiers, stop_handlers
-from .models import *
+from .models import (
+    User,
+    Operation,
+    Market,
+    LastCheck,
+    Position,
+    Classifier,
+    StopLoss,
+)
 from ..settings import Default
 from ..share.tools import Serialize
 
@@ -19,13 +28,11 @@ def DefaultStopLossParameters():
 
 @db_session
 def create_user(**kwargs):
-    portfolio = Portfolio(assets=Default.initial_assets)
-    User(**kwargs, portfolio=portfolio)
+    User(**kwargs)
 
 
 @db_session
 def create_default_operation(user):
-
     Operation(
         user=user,
         market=Market(),
