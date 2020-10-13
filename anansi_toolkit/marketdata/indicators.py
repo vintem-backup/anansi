@@ -54,7 +54,7 @@ class PriceFromKline:
                 axis=1))
 
         if indicator_column:
-            self._klines.loc[:, indicator_column] = indicator.series
+            self._klines.loc[:, indicator_column] = indicator._series
         return indicator
 
 
@@ -75,7 +75,7 @@ class Trend:
             ._series.rolling(window=number_of_candles).mean())
 
         if indicator_column:
-            self._klines.loc[:, indicator_column] = indicator.series
+            self._klines.loc[:, indicator_column] = indicator._series
         return indicator
 
 
