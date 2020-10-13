@@ -187,54 +187,6 @@ class FormatKlines:
             {"SecondsTimeFrame": seconds_in(self.time_frame)})
         return klines
 
-
-class Signal:
-
-    def __init__(self, from_side: str, to_side: str, by_stop=False):
-        self.from_side = from_side.capitalize()
-        self.to_side = to_side.capitalize()
-        self.by_stop = by_stop
-
-    def get(self):
-        if self.from_side == self.to_side:
-            return SIG.Hold
-
-        if self.from_side == SIDE.Zeroed:
-            if self.to_side == SIDE.Long:
-                return SIG.Buy
-
-            if self.to_side == SIDE.Short:
-                return SIG.NakedSell
-
-        if self.from_side == SIDE.Long:
-            if self.to_side == SIDE.Zeroed:
-                if self.by_stop:
-                    return SIG.StoppedFromLong
-                return SIG.Sell
-
-            if self.to_side == SIDE.Short:
-                return SIG.DoubleNakedSell
-
-        if self.from_side == SIDE.Short:
-            if self.to_side == SIDE.Zeroed:
-                if self.by_stop:
-                    return SIG.StoppedFromShort
-                return SIG.Buy
-
-            if self.to_side == SIDE.Long:
-                return SIG.DoubleBuy
-
-
-def get_signal(from_side, to_side, by_stop):
-    return Signal(from_side, to_side, by_stop).get()
-
-
-# class Result:
-#    def __init__(self, which_side: str, by_stop=False):
-#        self.side = which_side
-#        self.by_stop = by_stop
-
-
 class EventContainer:
     def __init__(self, reporter: str, description: str = None):
         self.reporter = reporter
