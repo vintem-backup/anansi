@@ -267,4 +267,4 @@ class BackTestingPriceGetter:
         price = klines.apply_indicator.trend.simple_moving_average(
             number_of_candles=5,
             metrics="ohlc4")
-        return float(price.series.mean())
+        return float(price._series.mean())
