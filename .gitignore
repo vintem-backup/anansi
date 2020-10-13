@@ -9,6 +9,7 @@ jupyterlog
 dev*
 issue_comment.md
 .idea/
+anansi_toolkit/test_module.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
