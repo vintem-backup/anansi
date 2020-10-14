@@ -1,8 +1,7 @@
 import time
 import pandas as pd
 import pendulum
-from . import data_brokers as brokers
-from .indicators import *
+from . import indicators, data_brokers as brokers
 from ..share.tools import ParseDateTime, seconds_in
 from ..share.db_handlers import StorageKlines
 
@@ -51,10 +50,10 @@ class KlinesDateTime:
 class ApplyIndicator:
     def __init__(self, klines):
         self._klines = klines
-        self.trend = Trend(self._klines)
-        self.momentum = Momentum(self._klines)
-        self.volatility = Volatility(self._klines)
-        self.volume = Volume(self._klines)
+        self.trend = indicators.Trend(self._klines)
+        self.momentum = indicators.Momentum(self._klines)
+        self.volatility = indicators.Volatility(self._klines)
+        self.volume = indicators.Volume(self._klines)
 
 
 class KlinesFromBroker:
