@@ -141,11 +141,9 @@ class SimpleKlinesTrader:
             try:
                 self._do_analysis()
                 self._execute_the_order_if_the_side_changes()
-                self._get_ready_to_repeat()
-
             except Exception as e:
                 self._report_to_log(str(e))
-            
+                        
             self.log.update(timestamp=self._now)
-        
+            self._get_ready_to_repeat()
         self._end()
