@@ -50,7 +50,7 @@ class SimpleKlinesTrader:
         step_in_seconds = (
             self.Classifier.step * self.Classifier.number_of_candles
         )
-        return self.KlinesGetter._oldest_open_time() + step_in_seconds
+        return self.KlinesGetter._oldest_open_time() + step_in_seconds + 3
 
     def _get_final_backtesting_now(self):
         return self.KlinesGetter._newest_open_time()
@@ -79,7 +79,7 @@ class SimpleKlinesTrader:
                 - pendulum.from_timestamp(self._now).second
             )
             time.sleep(sleep_time)
-            self._now = pendulum.now().int_timestamp
+            self._now = pendulum.now().int_timestamp + 3
 
     def _end(self):  # Not decided what do here yet
         self._report_to_log("It's the end!")
