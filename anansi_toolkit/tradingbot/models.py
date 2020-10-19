@@ -1,5 +1,3 @@
-from ..settings import Default, Environments, kline_desired_informations
-from ..share.tools import DefaultPrintLog
 import json
 import pendulum
 from pony.orm import (
