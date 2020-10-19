@@ -8,23 +8,45 @@ from pony.orm import (
     Set,
     StrArray,
     commit,
+    rollback,
     sql_debug,
+    TransactionError,
 )
+from ..settings import (
+    Default,
+    Environments,
+    PossibleSides as SIDE,
+)
+from .mixins import Report
 
 db, env = Database(), Environments.ENV
 
 db.bind(**env.ORM_bind_to)
 sql_debug(env.SqlDebug)
 
-# Common extension ('MixIn') for a several models
+
+def _safety_commit(retry=15):
+    attempts = 0
+    while attempts < retry:
+        attempts += 1
+        try:
+            commit()
+            break
+        except:  #!TODO: To logging
+            continue
+    if attempts >= retry:
+        rollback()
+    return
+
+
 class AttributeUpdater(object):
     def update(self, **kwargs):
         for item in kwargs.items():
             setattr(self, item[0], item[1])
-            commit()
+            _safety_commit()
+        return
 
 
-# Database models
 class User(db.Entity, AttributeUpdater):
     first_name = Required(str, unique=True)
     last_name = Optional(str)
