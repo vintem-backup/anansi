@@ -31,7 +31,6 @@ def remove_last_if_unclosed(klines):
 
 
 class DataBroker:
-
     def server_time(self) -> int:
         """Data e horário do servidor da corretora
 
@@ -59,7 +58,7 @@ class DataBroker:
         show_only_desired_info: bool = True,
         **kwargs
     ) -> pd.DataFrame:
-        """ Histórico (OHLCV) de mercado.
+        """Histórico (OHLCV) de mercado.
 
         Args:
             symbol (str): Símbolo do ativo
@@ -97,8 +96,8 @@ class BinanceDataBroker(DataBroker, settings.BinanceSettings):
     @doc_inherit
     def server_time(self) -> int:
         return int(
-            float((get_response(self._time_endpoint)).json()
-                  ["serverTime"]) / 1000
+            float((get_response(self._time_endpoint)).json()["serverTime"])
+            / 1000
         )
 
     @doc_inherit
