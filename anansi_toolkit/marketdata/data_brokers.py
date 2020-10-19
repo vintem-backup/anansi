@@ -1,24 +1,23 @@
-from .. import settings
-from ..share.tools import *
 import pandas as pd
 import requests
 import pendulum
+from .. import settings
+from ..share.tools import DocInherit, FormatKlines
 
 doc_inherit = DocInherit
 
-#! Translate docstrings and delete useless commented blocks
-
-# def wrapper_for(broker_name: str) -> str:
-#    _brokers = {
-#        "binance": "BinanceDataWrapper",
-#    }
-#    return _brokers[broker_name.lower()]
+#!TODO: Translate docstrings and delete useless commented blocks
 
 
 def get_response(endpoint: str) -> requests.models.Response:
-    with requests.get(endpoint) as response:
-        if response.status_code == 200:
-            return response
+    try:
+        with requests.get(endpoint) as response:
+            if response.status_code == 200:
+                return response
+    except Exception as e:
+        raise ConnectionError( #TODO: To logging
+            "Could not establish a broker connection. Details: {}".format(e)
+        )
 
 
 def remove_last_if_unclosed(klines):
