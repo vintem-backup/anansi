@@ -9,7 +9,7 @@ from functools import wraps, partial
 from time import time
 import pendulum
 import pandas as pd
-
+from tabulate import tabulate
 
 class ParseDateTime:
     fmt = "YYYY-MM-DD HH:mm:ss"
