@@ -272,8 +272,8 @@ class DefaultLog:
         self._timestamp = (
             pendulum.now().int_timestamp if not timestamp else timestamp
         )
-        if env.print_log:
-            self.print_log()
-
         self._log_dicts_to_json()
         self.append_log_to_database()
+
+
+db.generate_mapping(create_tables=True)
