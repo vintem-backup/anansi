@@ -90,8 +90,12 @@ class Market(db.Entity):
     ## It is not advisable to make the attributes below editable.
     operation = Optional(lambda: Operation)  # Foreing key
     exchange = Required(str, default=Default.exchange)
-    quote_asset_symbol = Required(str, default=Default.quote_asset_symbol)
-    base_asset_symbol = Required(str, default=Default.base_asset_symbol)
+    quote_symbol = Required(str, default=Default.quote_symbol)
+    base_symbol = Required(str, default=Default.base_symbol)
+
+    @property
+    def ticker_symbol(self):
+        return self.quote_symbol + self.base_symbol
 
 
 class LastCheck(db.Entity, AttributeUpdater):
