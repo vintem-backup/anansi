@@ -7,6 +7,7 @@ from .models import (
     Market,
     LastCheck,
     Position,
+    Assets,
     Classifier,
     StopLoss,
 )
@@ -36,7 +37,7 @@ def create_default_operation(user):
     Operation(
         user=user,
         market=Market(),
-        position=Position(),
+        position=Position(assets=Assets()),
         last_check=LastCheck(by_classifier_at=0),
         classifier=Classifier(
             name=Default.classifier, parameters=DefaultClassifierParameters()
