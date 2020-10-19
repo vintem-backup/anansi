@@ -1,6 +1,6 @@
 import os
 
-
+# TODO: Change to environs
 def GetEnvironment(var_name, default):
     try:
         return os.environ[var_name]
@@ -8,9 +8,7 @@ def GetEnvironment(var_name, default):
         try:
             return default
         except KeyError:
-            error_msg = 'Set the {} environment variable'.format(var_name)
-            raise ImproperlyConfigured(error_msg)
-
+            pass
 
 AUTO_START = GetEnvironment("AUTO_START", default=False)
 
@@ -43,7 +41,7 @@ class SupportedExchanges:
 
 
 class ImplementedTraders:
-    DefaultTrader = "DefaultTrader"
+    SimpleKlinesTrader = "SimpleKlinesTrader"
 
 
 class ImplementedClassifiers:
@@ -60,6 +58,7 @@ class PossibleStatuses:
 
 
 class PossibleModes:
+    Advisor = "Advisor"
     BackTesting = "BackTesting"
     RealTrading = "RealTrading"
     RealTimeTest = "RealTimeTest"
@@ -72,12 +71,12 @@ class PossibleSides:
 
 
 class PossibleSignals:
-    StopByPassed = "StopByPassed"
+    SkippedDueToStopLoss = "SkippedDueToStopLoss"
     Hold = "Hold"
     Buy = "Buy"
     Sell = "Sell"
     NakedSell = "NakedSell"
-    DoubleNakedSell = "DoubleNakedSell"
+    DoubleSell = "DoubleSell"
     DoubleBuy = "DoubleBuy"
     StopFromLong = "StopFromLong"
     StopFromShort = "StopFromShort"
@@ -89,19 +88,19 @@ class PossibleOrderTypes:
 
 
 class Default:
-    trader = ImplementedTraders.DefaultTrader
+    trader = ImplementedTraders.SimpleKlinesTrader
     classifier = ImplementedClassifiers.CrossSMA
     stop_loss = ImplementedStopLosses.StopTrailing3T
     status = PossibleStatuses.NotRunning
     mode = PossibleModes.BackTesting
     exchange = SupportedExchanges.binance
-    quote_asset_symbol = "BTC"
-    base_asset_symbol = "USDT"
+    quote_symbol = "BTC"
+    base_symbol = "USDT"
     side = PossibleSides.Zeroed
-    initial_assets = {
-        'BTC': 0.0,
-        'USDT': 100.00}
-
+    initial_base_amount = 100.00
+    # NakedSell, DoubleBuy and DoubleSell, if allowed, must be declared below
+    # (like strings); example: [PossibleSignals.NakedSell] or ["NakedSell"]
+    allowed_special_signals = []
 
 kline_desired_informations = [
     "Open_time",

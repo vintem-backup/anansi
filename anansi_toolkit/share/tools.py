@@ -9,7 +9,7 @@ from functools import wraps, partial
 from time import time
 import pendulum
 import pandas as pd
-
+from tabulate import tabulate
 
 class ParseDateTime:
     fmt = "YYYY-MM-DD HH:mm:ss"
@@ -76,9 +76,7 @@ def timing(f):
 
 class DocInherit(object):
     """ Docstring inheriting method descriptor
-
     The class itself is also used as a decorator
-
     Reference: <http://code.activestate.com/recipes/576862/>
     """
 
@@ -93,7 +91,6 @@ class DocInherit(object):
             return self.get_no_inst(cls)
 
     def get_with_inst(self, obj, cls):
-
         overridden = getattr(super(cls, obj), self.name, None)
 
         @wraps(self.method, assigned=("__name__", "__module__"))
@@ -103,7 +100,6 @@ class DocInherit(object):
         return self.use_parent_doc(f, overridden)
 
     def get_no_inst(self, cls):
-
         for parent in cls.__mro__[1:]:
             overridden = getattr(parent, self.name, None)
             if overridden:
@@ -187,103 +183,11 @@ class FormatKlines:
             {"SecondsTimeFrame": seconds_in(self.time_frame)})
         return klines
 
-
-class Signal:
-
-    def __init__(self, from_side: str, to_side: str, by_stop=False):
-        self.from_side = from_side.capitalize()
-        self.to_side = to_side.capitalize()
-        self.by_stop = by_stop
-
-    def get(self):
-        if self.from_side == self.to_side:
-            return SIG.Hold
-
-        if self.from_side == SIDE.Zeroed:
-            if self.to_side == SIDE.Long:
-                return SIG.Buy
-
-            if self.to_side == SIDE.Short:
-                return SIG.NakedSell
-
-        if self.from_side == SIDE.Long:
-            if self.to_side == SIDE.Zeroed:
-                if self.by_stop:
-                    return SIG.StoppedFromLong
-                return SIG.Sell
-
-            if self.to_side == SIDE.Short:
-                return SIG.DoubleNakedSell
-
-        if self.from_side == SIDE.Short:
-            if self.to_side == SIDE.Zeroed:
-                if self.by_stop:
-                    return SIG.StoppedFromShort
-                return SIG.Buy
-
-            if self.to_side == SIDE.Long:
-                return SIG.DoubleBuy
-
-
-def get_signal(from_side, to_side, by_stop):
-    return Signal(from_side, to_side, by_stop).get()
-
-
-# class Result:
-#    def __init__(self, which_side: str, by_stop=False):
-#        self.side = which_side
-#        self.by_stop = by_stop
+def table_from_dict(my_dict:dict)->str:
+    return tabulate([list(my_dict.values())], headers=list(my_dict.keys()))
 
 
 class EventContainer:
     def __init__(self, reporter: str, description: str = None):
         self.reporter = reporter
         self.description = description
-
-
-class DefaultPrintLog(object):
-    def _print_collection(self, entry):
-        max_n_dots = 30
-        for item in entry.items():
-            n_dots = max_n_dots - len(item[0])
-            print(
-                "{}{}: {}".format(item[0], "".join(n_dots*["."]), item[1]))
-
-    def print_log(self):
-        print("======================================")
-        print("Claimed at: {}".format(
-            pendulum.now().format(fmt="YYYY-MMMM-DD HH:mm:ss")))
-        print("======================================")
-        print(" ")
-
-        if len(self.last_analyzed_data) > 0:
-            print("# LAST ANALYZED DATA BY {}:".format(
-                (self.analyzed_by).upper()))
-
-            print(" ")
-            self._print_collection(self.last_analyzed_data)
-            print(" ")
-            print("# Results:")
-            print(" ")
-            self._print_collection(self.analysis_result)
-            print(" ")
-            print("# Order:")
-            self._print_collection(self.order)
-
-        print("# Events:")
-        print(" ")
-        self._print_collection(self.events_on_a_cycle)
-        print(" ")
-        print("# Portfolio composition:")
-        print(" ")
-        try:
-            self._print_collection(
-                json.loads(self.operation.user.portfolio.assets))
-
-        except:
-            try:
-                self._print_collection(
-                    self.operation.user.portfolio.assets)
-            except:
-                pass
-        print(" ")

@@ -1,196 +1,166 @@
+import time
 import pendulum
+import math
+from ..marketdata import handlers
+from ..share.tools import EventContainer
+from . import classifiers, orders
 from .models import DefaultLog
-from . import classifiers, stop_handlers, order_handler
-from ..marketdata.handlers import *
-from ..share.tools import *
+
 from ..settings import (
+    PossibleModes as MODE,
+    PossibleOrderTypes as ORD,
     PossibleSides as SIDE,
     PossibleStatuses as STAT,
-    PossibleModes as MODE,
-    PossibleSignals as SIG,
-    PossibleOrderTypes as ORD,
 )
 
-
-class Order:
-    # def __init__(self):
-    signal: str = SIG.Hold
-    to_side: str = None
-    order_type = ORD.Market
-    amount: float = None
-    price: float = None
-
-
-class DefaultTrader:
+class SimpleKlinesTrader:
     def __init__(self, operation):
-        ticker_symbol = (operation.market.quote_asset_symbol
-                         + operation.market.base_asset_symbol)
-
-        self._step = None
-        self.operation = operation
-        self.event = EventContainer(reporter=self.__class__.__name__)
+        self._event = EventContainer(reporter=self.__class__.__name__)
+        self.ticker_symbol = (
+            operation.market.quote_symbol + operation.market.base_symbol
+        )
         self.log = DefaultLog(operation)
-        self.result = None
-        self.order = Order()
-        self.OrderHandler = (order_handler.OrderHandler(operation=operation,
-                                                        log=self.log))
-
+        self.OrderHandler = orders.Handler(operation, self.log)
         self.Classifier = getattr(classifiers, operation.classifier.name)(
-            parameters=operation.classifier.parameters, log=self.log)
+            parameters=operation.classifier.parameters, log=self.log
+        )
+        self.operation = operation
+        self.last_result = None
+        self._step:int = None
+        self._price_now:float = None
+        self._instantiate_klines_and_price_getters()
 
-        self._classifier_time_frame_in_seconds = seconds_in(
-            self.Classifier.parameters.time_frame)
-
-        self.StopLoss = getattr(stop_handlers, operation.stop_loss.name)(
-            parameters=operation.stop_loss.parameters, log=self.log)
-
-        self._stop_loss_time_frame_in_seconds = seconds_in(
-            self.StopLoss.parameters.time_frame)
-
-        self.Klines = KlinesFromBroker(
-            operation.market.exchange, ticker_symbol)
-
-        self._now = pendulum.now().int_timestamp
-
-        if self.operation.mode == MODE.BackTesting:
-            self.Klines = BackTestingKlines(
-                operation.market.exchange, ticker_symbol)
-
-            self._now = self._get_initial_backtesting_now()
-            self._final_backtesting_now = self._get_final_backtesting_now()
-
-        self.OrderHandler._now = self._now  # Important if BackTesting mode
+    def _instantiate_klines_and_price_getters(self):
+        backtesting = bool(self.operation.mode == MODE.BackTesting)
+        kwargs = dict(
+            broker_name=self.operation.market.exchange,
+            ticker_symbol=self.ticker_symbol,
+        )
+        tf = dict(time_frame=self.Classifier.parameters.time_frame)
+        self.KlinesGetter = (
+            handlers.BackTestingKlines(**kwargs, **tf)
+            if backtesting
+            else handlers.KlinesFromBroker(**kwargs, **tf)
+        )
+        self.PriceGetter = (
+            handlers.BackTestingPriceGetter(**kwargs)
+            if backtesting
+            else handlers.PriceGetter(**kwargs)
+        )
 
     def _get_initial_backtesting_now(self):
-        self.Klines.time_frame = self.Classifier.parameters.time_frame
-
-        step_in_seconds = (self._classifier_time_frame_in_seconds *
-                           self.Classifier.n_samples_to_analyze)
-
-        return self.Klines._oldest_open_time() + step_in_seconds
+        step_in_seconds = (
+            self.Classifier.step * self.Classifier.number_of_candles
+        )
+        return self.KlinesGetter._oldest_open_time() + step_in_seconds + 3
 
     def _get_final_backtesting_now(self):
-        self.Klines.time_frame = self.Classifier.parameters.time_frame
-        return self.Klines._newest_open_time()
+        return self.KlinesGetter._newest_open_time()
 
-    def _get_ready_to_repeat(self):
-        if self.operation.mode == MODE.BackTesting:
-            self._now += self._step
-            self.OrderHandler._now = self._now  # Important if BackTesting mode
-
-            if self._now > self._final_backtesting_now:
-                self.operation.status = STAT.NotRunning
-        else:
-            sleep_time = (self._step
-                          - pendulum.from_timestamp(self._now).second)
-
-            time.sleep(sleep_time)
-            self._now = pendulum.now().int_timestamp
-
-    def _do_analysis(self):
-        self._step = self._classifier_time_frame_in_seconds
-        CheckStop = self.operation.stop_is_on
-        IsPositioned = bool(
-            self.operation.position.side != SIDE.Zeroed)
-
-        if IsPositioned and CheckStop:
-            self._step = self._stop_loss_time_frame_in_seconds
-            self._stop_analysis()
-
-        self._classifier_analysis()
-
-    def _stop_analysis(self):
-        print("Entering on null stoploss")
-
-    def _classifier_analysis(self):
-        NewDataToAnalyze = bool(
-            self._now >= (
-                self.operation.last_check.by_classifier_at +
-                self._classifier_time_frame_in_seconds))
-
-        if NewDataToAnalyze:
-            self._analyze_for(self.Classifier)
-            self.operation.last_check.update(by_classifier_at=self._now)
-
-        else:
-            print("No new data do analyze")
-
-    def _analyze_for(self, Analyzer):
-        self.Klines.time_frame = Analyzer.parameters.time_frame
-
-        Analyzer.data_to_analyze = self.Klines.get(
-            number_of_candles=Analyzer.n_samples_to_analyze,
-            until=self._now)
-
-        self.result = Analyzer.get_result()
-
-    def _start(self):
+    def _start(self):  
+        self.operation.if_no_assets_fill_them() 
+        self._now = pendulum.now().int_timestamp
         self.operation.update(status=STAT.Running)
 
         if self.operation.mode == MODE.BackTesting:
-            self.operation.last_check.update(by_classifier_at=0)
-            self.operation.position.update(Side=SIDE.Zeroed)
+            self.operation.reset()
+            
+            #TODO: Refactoring suggestion: The initial and final 
+            # values ​​of '_now' must be attributes of the operation
+            self._now = self._get_initial_backtesting_now()
+            self._final_backtesting_now = self._get_final_backtesting_now()
 
-    def _end(self):  # Not decided what do here yet
-        self.event.description = "It's the end!"
-        self.log.report(self.event)
+    def _get_ready_to_repeat(self):
+        self._consolidate_log()
+        if self.operation.mode == MODE.BackTesting:
+            self.operation.print_report()
+            self._now += self._step
 
-    def _prepare_order(self):
-        self.order.price = self.result.price
+            if self._now > self._final_backtesting_now:
+                self.operation.update(status=STAT.NotRunning)
 
-        signal = get_signal(
-            from_side=self.operation.position.side,
-            to_side=self.result.side,
-            by_stop=self.result.by_stop)
+        else:
+            sleep_time = (
+                self._step
+                - pendulum.from_timestamp(self._now).second
+            )
+            time.sleep(sleep_time)
+            self._now = pendulum.now().int_timestamp + 3
 
-        self.event.description = "Original signal: {}".format(signal)
-        self.log.report(self.event)
+    def _end(self):  #TODO: Make a final report
+        self._report_to_log("It's the end!") #TODO: Not appending, cause is after "repeat"
 
-        HoldIfRecentlyStopped = self.operation.hold_if_stopped
+    def _get_price(self):
+        price = self.PriceGetter.get(at=self._now)
+        if math.isnan(price):
+            raise ValueError("Fail to get price")
+        else:
+            self._price_now = price
+        return
 
-        if HoldIfRecentlyStopped:
-            StoppedFromLong = bool(
-                self.operation.position.due_to_signal == SIG.StopFromLong)
+    def _do_analysis(self):
+        self._get_price()
+        self._step = self.Classifier.step
+        is_positioned = bool(self.operation.position.side != SIDE.Zeroed)
 
-            StoppedFromShort = bool(
-                self.operation.position.due_to_signal == SIG.StopFromShort)
+        if is_positioned and self.operation.is_stop_loss_enabled:
+            pass
+            # self._step = self.StopLoss.step
+            # self._stop_analysis()
 
-            IgnoreSignalDueToStop = bool(
-                (signal == SIG.Buy and StoppedFromLong) or
-                (signal == SIG.Sell and StoppedFromShort))
+        self._classifier_analysis()
 
-            if IgnoreSignalDueToStop:
-                signal = SIG.StopByPassed
-                self.event.description = signal
-                self.log.report(self.event)
+    def _classifier_analysis(self):
+        is_there_a_new_candle = bool(
+            self._now
+            >= (
+                self.operation.last_check.by_classifier_at
+                + self.Classifier.step
+            )
+        )
+        if is_there_a_new_candle:
+            kwargs = dict(
+                number_of_candles=self.Classifier.number_of_candles,
+                until=self._now,
+            )
+            data = self.KlinesGetter.get(**kwargs)
+            self.last_result = self.Classifier.get_result_for_this(data)
+            self.operation.last_check.update(by_classifier_at=self._now)
+    
+    def _stop_analysis(self):
+        pass
 
-        if signal == SIG.NakedSell:
-            self.order.signal = SIG.Hold
+    def _execute_the_order_if_the_side_changes(self):
+        current_side = self.operation.position.side
+        suggested_side = self.last_result.side
+        
+        if current_side != suggested_side:
+            order = dict(
+                timestamp=self._now,
+                from_side=current_side,
+                to_side=suggested_side, 
+                price = self._price_now,
+                due_to_stop = self.last_result.due_to_stop,
+            )
+            self.OrderHandler.execute(order)
 
-        elif signal == SIG.DoubleNakedSell:
-            self.order.signal = SIG.Sell
+    def _report_to_log(self, event_description:str):
+        self._event.description = event_description
+        self.log.report(self._event)
 
-        elif signal == SIG.DoubleBuy:
-            self.order.signal = SIG.Buy
-
-        if self.order.signal == SIG.Buy:
-            self.order.to_side = SIDE.Long
-
-        if self.order.signal == SIG.Sell:
-            self.order.to_side = SIDE.Zeroed
-
+    def _consolidate_log(self):
+        self.log.price = self._price_now
+        self.log.update(timestamp=self._now)
+        return
+    
     def run(self):
         self._start()
         while self.operation.status == STAT.Running:
-            # try:
-            self._do_analysis()
-            self._prepare_order()
-            self.OrderHandler.execute(self.order)
+            try:
+                self._do_analysis()
+                self._execute_the_order_if_the_side_changes()
+            except (Exception, ConnectionError) as e:
+                self._report_to_log(str(e))
+            
             self._get_ready_to_repeat()
-
-            # except Exception as e:
-            #    self.event.description = str(e)
-            #    self.log.report(self.event)
-
-            self.log.update()
         self._end()
