@@ -60,11 +60,18 @@ class User(db.Entity, AttributeUpdater):
 
 class Position(db.Entity, AttributeUpdater):
     operation = Optional(lambda: Operation)  # Foreing key
+    assets = Required(lambda: Assets, cascade_delete=True)
     side = Required(str, default=Default.side)
-    initial_assets = Required(Json, default=json.dumps(Default.initial_assets))
-    current_assets = Required(Json, default=json.dumps(Default.initial_assets))
+    traded_price = Optional(float)
+    traded_at = Optional(int)  # UTC timestamp
     due_to_signal = Optional(str)
     exit_reference_price = Optional(float)
+
+
+class Assets(db.Entity, AttributeUpdater):
+    position = Optional(Position)
+    quote = Optional(float, default=0.0)
+    base = Optional(float, default=0.0)
 
 
 class Classifier(db.Entity, AttributeUpdater):
