@@ -1,5 +1,6 @@
 import time
 import pendulum
+import math
 from ..marketdata import handlers
 from ..share.tools import EventContainer
 from . import classifiers, orders
@@ -14,18 +15,19 @@ from ..settings import (
 
 class SimpleKlinesTrader:
     def __init__(self, operation):
-        _quote = operation.market.quote_asset_symbol
-        _base = operation.market.base_asset_symbol
-        self.ticker_symbol = _quote + _base
-        self.operation = operation
         self._event = EventContainer(reporter=self.__class__.__name__)
+        self.ticker_symbol = (
+            operation.market.quote_symbol + operation.market.base_symbol
+        )
         self.log = DefaultLog(operation)
-        self.last_result = None
-        self._step = None
-        self.OrderHandler = orders.Handler(self.operation, self.log)
+        self.OrderHandler = orders.Handler(operation, self.log)
         self.Classifier = getattr(classifiers, operation.classifier.name)(
             parameters=operation.classifier.parameters, log=self.log
         )
+        self.operation = operation
+        self.last_result = None
+        self._step:int = None
+        self._price_now:float = None
         self._instantiate_klines_and_price_getters()
 
     def _instantiate_klines_and_price_getters(self):
@@ -55,19 +57,23 @@ class SimpleKlinesTrader:
     def _get_final_backtesting_now(self):
         return self.KlinesGetter._newest_open_time()
 
-    def _start(self):
+    def _start(self):  
+        self.operation.if_no_assets_fill_them() 
         self._now = pendulum.now().int_timestamp
         self.operation.update(status=STAT.Running)
 
         if self.operation.mode == MODE.BackTesting:
-            self.operation.last_check.update(by_classifier_at=0)
-            self.operation.position.update(side=SIDE.Zeroed)
+            self.operation.reset()
+            
+            #TODO: Refactoring suggestion: The initial and final 
+            # values ​​of '_now' must be attributes of the operation
             self._now = self._get_initial_backtesting_now()
             self._final_backtesting_now = self._get_final_backtesting_now()
 
     def _get_ready_to_repeat(self):
+        self._consolidate_log()
         if self.operation.mode == MODE.BackTesting:
-            #print_log
+            self.operation.print_report()
             self._now += self._step
 
             if self._now > self._final_backtesting_now:
@@ -81,10 +87,19 @@ class SimpleKlinesTrader:
             time.sleep(sleep_time)
             self._now = pendulum.now().int_timestamp + 3
 
-    def _end(self):  # Not decided what do here yet
-        self._report_to_log("It's the end!")
+    def _end(self):  #TODO: Make a final report
+        self._report_to_log("It's the end!") #TODO: Not appending, cause is after "repeat"
+
+    def _get_price(self):
+        price = self.PriceGetter.get(at=self._now)
+        if math.isnan(price):
+            raise ValueError("Fail to get price")
+        else:
+            self._price_now = price
+        return
 
     def _do_analysis(self):
+        self._get_price()
         self._step = self.Classifier.step
         is_positioned = bool(self.operation.position.side != SIDE.Zeroed)
 
@@ -111,6 +126,7 @@ class SimpleKlinesTrader:
             data = self.KlinesGetter.get(**kwargs)
             self.last_result = self.Classifier.get_result_for_this(data)
             self.operation.last_check.update(by_classifier_at=self._now)
+    
     def _stop_analysis(self):
         pass
 
@@ -123,7 +139,7 @@ class SimpleKlinesTrader:
                 timestamp=self._now,
                 from_side=current_side,
                 to_side=suggested_side, 
-                price = self.PriceGetter.get(at=self._now),
+                price = self._price_now,
                 due_to_stop = self.last_result.due_to_stop,
             )
             self.OrderHandler.execute(order)
@@ -132,18 +148,19 @@ class SimpleKlinesTrader:
         self._event.description = event_description
         self.log.report(self._event)
 
-    def print_log(self):
-        pass
-
+    def _consolidate_log(self):
+        self.log.price = self._price_now
+        self.log.update(timestamp=self._now)
+        return
+    
     def run(self):
         self._start()
         while self.operation.status == STAT.Running:
             try:
                 self._do_analysis()
                 self._execute_the_order_if_the_side_changes()
-            except Exception as e:
+            except (Exception, ConnectionError) as e:
                 self._report_to_log(str(e))
-                        
-            self.log.update(timestamp=self._now)
+            
             self._get_ready_to_repeat()
         self._end()
