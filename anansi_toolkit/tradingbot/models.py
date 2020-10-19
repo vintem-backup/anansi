@@ -248,15 +248,16 @@ class DefaultLog:
             events=self.events_on_a_cycle,
         )
         self._create_operational_log(**kwargs)
+        return
 
     def _real_trading_log_append(self):
-        pass
+        self._backtesting_log_append()
 
     def _real_time_test_log_append(self):
-        pass
+        self._backtesting_log_append()
 
     def _advisor_log_append(self):
-        pass
+        self._backtesting_log_append()
 
     def report(self, event):
         event_key = "{}_{}".format(
