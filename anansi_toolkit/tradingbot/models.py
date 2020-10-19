@@ -226,11 +226,21 @@ class DefaultLog:
         self.operation.operational_log.create(
             **kwargs, timestamp=self._timestamp
         )
-        commit()
+        _safety_commit()
         self._reset()
+        return
 
+    # TODO: Refactoring suggestion: in 'settings', declare the modes
+    # as subclasses of 'PossibleModes' and better describe these
+    # modes, with attributes like 'info_should_be_logged: list'.
     def _backtesting_log_append(self):
+        self._equivalent_base_amount = (
+            self.operation.position.assets.base
+            + self.operation.position.assets.quote * self._price
+        )
         kwargs = dict(
+            price=self._price,
+            equivalent_base_amount=self._equivalent_base_amount,
             analyzed_by=self.analyzed_by,
             last_analyzed_data=self.last_analyzed_data,
             analysis_result=self.analysis_result,
