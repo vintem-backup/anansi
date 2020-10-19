@@ -1,13 +1,13 @@
-from pony.orm import commit
+# from pony.orm import commit
+# from .models import _safety_commit
 import json
 from ..settings import (
     PossibleSignals as SIG,
     PossibleSides as SIDE,
     PossibleModes as MODE,
 )
-from ..share.tools import EventContainer, Serialize
+from ..share.tools import EventContainer, Serialize, table_from_dict
 from .trade_brokers import trade_broker
-
 
 class Order:
     def __init__(
@@ -82,59 +82,63 @@ class Handler:
         self.operation = operation
         self.log = log
         self._event = EventContainer(reporter=self.__class__.__name__)
-        self.quote_key = operation.market.quote_asset_symbol
-        self.base_key = operation.market.base_asset_symbol
-        ticker_symbol = self.quote_key + self.base_key
+        ticker_symbol = (
+            operation.market.quote_symbol + operation.market.base_symbol
+        )
         self.broker = trade_broker(operation.market.exchange, ticker_symbol)
         self._order_execute = getattr(
             self, "_{}_executor".format((operation.mode).lower())
         )
+        self._base = 0.0
+        self._quote = 0.0
+        self._trade_details = dict()
 
     def _report_to_log(self, event_description: str):
         self._event.description = event_description
         self.log.report(self._event)
 
-    def _avaliable(self, asset: str):
-        try:
-            return json.loads(self.operation.position.current_assets)[asset]
-
-        except Exception as e:
-            msg = "Fail to get avaliable {} due to {}".format(asset, e)
-            self._report_to_log(msg)
-            return 0.0
+    def _get_avaliable(self):
+        self._base = self.operation.position.assets.base
+        self._quote = self.operation.position.assets.quote
 
     def _calculate_amount(self):
         signal = self.SigGen.signal
         raw_amount = 0.0
+        self._get_avaliable()
 
         if signal in [SIG.Buy, SIG.StopFromShort]:  # , SIG.DoubleBuy]:
-            raw_amount = self._avaliable(self.base_key) / self.order.price
+            raw_amount = self._base / self.order.price
 
         elif signal in [SIG.Sell, SIG.StopFromLong]:  # , SIG.DoubleSell]:
-            raw_amount = self._avaliable(self.quote_key)
+            raw_amount = self._quote
 
         factor = int(raw_amount / self.broker.mininal_amount)
         self.order.amount = factor * self.broker.mininal_amount
 
     def _proceed_updates(self):
-        new_assets = {
-            self.quote_key: self._new_quote_amount,
-            self.base_key: self._new_base_amount,
-        }
+        self.operation.position.assets.update(
+            quote=self._new_quote_amount, base=self._new_base_amount
+        )
         self.operation.position.update(
             side=self.SigGen.side,
-            current_assets=json.dumps(new_assets),
+            traded_price=self.order.price,
+            traded_at=self.order.timestamp,
             due_to_signal=self.order.signal,
         )
-        kwargs = dict(
+        self._trade_details = dict(
             timestamp=self.order.timestamp,
             signal=self.order.signal,
             price=self.order.price,
-            fee=self.fee_base,
             quote_amount=self.order.amount,
+            fee=self.fee_base,
         )
-        self.operation.trades_log.create(**kwargs)
-        commit()
+        self.operation.new_trade_log(self._trade_details)
+        return
+
+    def _notify_trade(self):
+        if self.operation.mode == MODE.BackTesting:
+            print(table_from_dict(self._trade_details))
+        return
 
     def _backtesting_executor(self):
         signal = self.order.signal
@@ -144,12 +148,8 @@ class Handler:
         if signal in [SIG.Buy, SIG.StopFromShort]:  # , SIG.DoubleBuy]:
             spent_base_amount = self.order.amount * self.order.price
             bought_quote_amount = self.order.amount - self.fee_quote
-            self._new_quote_amount = (
-                self._avaliable(self.quote_key) + bought_quote_amount
-            )
-            self._new_base_amount = (
-                self._avaliable(self.base_key) - spent_base_amount
-            )
+            self._new_quote_amount = self._quote + bought_quote_amount
+            self._new_base_amount = self._base - spent_base_amount
             self._proceed_updates()
 
         elif signal in [SIG.Sell, SIG.StopFromLong]:  # , SIG.DoubleSell]:
@@ -157,13 +157,11 @@ class Handler:
             bought_base_amount = (
                 self.order.amount * self.order.price - self.fee_base
             )
-            self._new_quote_amount = (
-                self._avaliable(self.quote_key) - spent_quote_amount
-            )
-            self._new_base_amount = (
-                self._avaliable(self.base_key) + bought_base_amount
-            )
+            self._new_quote_amount = self._quote - spent_quote_amount
+            self._new_base_amount = self._base + bought_base_amount
             self._proceed_updates()
+
+        return
 
     def _advisor_executor(self):
         pass
@@ -191,3 +189,5 @@ class Handler:
         # signal. This is useful to check if the signal filtering is
         # working correctly.
         self.log.order = Serialize(self.order).to_dict()
+        self._notify_trade()
+        return
