@@ -195,6 +195,18 @@ class DefaultLog:
             self, "_{}_log_append".format((operation.mode).lower())
         )
         self._reset()
+        self._price: float = None
+        self._equivalent_base_amount: float = None
+
+    @property
+    def price(self):
+        return self._price
+
+    @price.setter
+    def price(self, price_to_set):
+        if price_to_set:
+            if price_to_set > 0.0:
+                self._price = price_to_set
 
     def _reset(self):
         self._timestamp = 0
