@@ -153,14 +153,18 @@ class Operation(db.Entity, AttributeUpdater, OperationMixIn, Report):
     )
     status = Required(str, default=Default.status)
     last_check = Required(LastCheck)
-    operational_log = Set(lambda: OperationalLog, cascade_delete=False)
-    trades_log = Set(lambda: TradeLog, cascade_delete=False)
+    operational_log = Set(lambda: OperationalLog, cascade_delete=True)
+    trades_log = Set(lambda: TradeLog, cascade_delete=True)
 
 
 class OperationalLog(db.Entity):
     # Present in all logs:
     operation = Optional(Operation)  # Foreing key
     timestamp = Optional(int)  # UTC
+    price = Optional(float)
+    equivalent_base_amount = Optional(
+        float
+    )  # TODO: The OperationMixIn will do this (maybe.)
     # Optional for each log:
     analyzed_by = Optional(str)
     last_analyzed_data = Optional(Json)
