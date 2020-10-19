@@ -183,55 +183,11 @@ class FormatKlines:
             {"SecondsTimeFrame": seconds_in(self.time_frame)})
         return klines
 
+def table_from_dict(my_dict:dict)->str:
+    return tabulate([list(my_dict.values())], headers=list(my_dict.keys()))
+
+
 class EventContainer:
     def __init__(self, reporter: str, description: str = None):
         self.reporter = reporter
         self.description = description
-
-
-class DefaultPrintLog(object):
-    def _print_collection(self, entry):
-        max_n_dots = 30
-        for item in entry.items():
-            n_dots = max_n_dots - len(item[0])
-            print(
-                "{}{}: {}".format(item[0], "".join(n_dots*["."]), item[1]))
-
-    def print_log(self):
-        print("======================================")
-        print("Claimed at: {}".format(
-            pendulum.now().format(fmt="YYYY-MMMM-DD HH:mm:ss")))
-        print("======================================")
-        print(" ")
-
-        if len(self.last_analyzed_data) > 0:
-            print("# LAST ANALYZED DATA BY {}:".format(
-                (self.analyzed_by).upper()))
-
-            print(" ")
-            self._print_collection(self.last_analyzed_data)
-            print(" ")
-            print("# Results:")
-            print(" ")
-            self._print_collection(self.analysis_result)
-            print(" ")
-            print("# Order:")
-            self._print_collection(self.order)
-
-        print("# Events:")
-        print(" ")
-        self._print_collection(self.events_on_a_cycle)
-        print(" ")
-        print("# Portfolio composition:")
-        print(" ")
-        try:
-            self._print_collection(
-                json.loads(self.operation.user.portfolio.assets))
-
-        except:
-            try:
-                self._print_collection(
-                    self.operation.user.portfolio.assets)
-            except:
-                pass
-        print(" ")
