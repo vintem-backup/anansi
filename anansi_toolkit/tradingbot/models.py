@@ -178,22 +178,15 @@ class TradeLog(db.Entity, AttributeUpdater):
     timestamp = Optional(int)  # UTC
     signal = Optional(str)
     price = Optional(float)
-    fee = Optional(float)  # base_asset units
     quote_amount = Optional(float)  # no discount due to fees
+    fee = Optional(float)  # base units
 
 
-db.generate_mapping(create_tables=True)
-
-
-
-# Specific database models handlers
-
-
-class DefaultLog(DefaultPrintLog):
-    """ TODO: Testar injetar esta classe como MixIn em 'OperationLog'.
-    TODO: Não mais herdar de 'DefaultPrintLog'. A incumbência de formarmatar
-    e imprimir a mensagem de log deve ser do trader, que conhece o
-    formato do dado.
+class DefaultLog:
+    """TODO: Refactoring suggestion: Make the log 100% json ('noSQl'), thus
+    having total freedom over what to append, for each mode, on each cycle.
+    The json could be deserialized, in order to consume the information when
+    they gona need to be computed and reported.
     """
 
     def __init__(self, operation):
