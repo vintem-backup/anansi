@@ -94,14 +94,12 @@ class Default:
     status = PossibleStatuses.NotRunning
     mode = PossibleModes.BackTesting
     exchange = SupportedExchanges.binance
-    quote_asset_symbol = "BTC"
-    base_asset_symbol = "USDT"
+    quote_symbol = "BTC"
+    base_symbol = "USDT"
     side = PossibleSides.Zeroed
-    initial_assets = {
-        'BTC': 0.0,
-        'USDT': 100.00}
-    # NakedSell, DoubleBuy and DoubleSell, if allowed, must be declared below;
-    # example: [PossibleSignals.NakedSell, ...]
+    initial_base_amount = 100.00
+    # NakedSell, DoubleBuy and DoubleSell, if allowed, must be declared below
+    # (like strings); example: [PossibleSignals.NakedSell] or ["NakedSell"]
     allowed_special_signals = []
 
 kline_desired_informations = [
