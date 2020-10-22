@@ -36,7 +36,8 @@ dependencies):
 
     poetry run python -m ipykernel install --user --name=$(basename $(pwd))
 
-... or:
+... or:  
+
     poetry run python -m ipykernel install --user --name=(basename (pwd))
 
 if you are a [fish](https://fishshell.com/ "command line shell interpreter")
