@@ -1,5 +1,3 @@
-# from pony.orm import commit
-# from .models import _safety_commit
 import json
 from ..settings import (
     PossibleSignals as SIG,
