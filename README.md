@@ -57,6 +57,7 @@ or, if you want to release the prompt, do:
 You must have to do this on a isolated environment, with dependencies embedded, doing:
 
     poetry shell
+    python
 
 ## Straight to the point: Running Default Back Testing Operation
 
