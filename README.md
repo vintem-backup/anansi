@@ -23,6 +23,7 @@ Just type:
     pip install anansi-toolkit
 
 or clone it from this repo and install it's dependencies by doing:
+
     git clone gitlab.com/marcusmello/anansi
     poetry install
 
