@@ -1,8 +1,8 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-
-from ..settings import (PossibleSides as SIDE,
-                        PossibleSignals as SIG, PossibleOrderTypes as ORD)
+from ..settings import (
+    PossibleSides as SIDE,
+    PossibleSignals as SIG,
+    PossibleOrderTypes as ORD,
+)
 import json
 from collections import namedtuple
 from functools import wraps, partial
@@ -11,7 +11,9 @@ import pendulum
 import pandas as pd
 from tabulate import tabulate
 
+
 class ParseDateTime:
+    """ Only work from/to 'YYYY-MM-DD HH:mm:ss' format """
     fmt = "YYYY-MM-DD HH:mm:ss"
 
     def __init__(self, date_time_in):
@@ -19,7 +21,8 @@ class ParseDateTime:
 
     def from_human_readable_to_timestamp(self):
         return pendulum.from_format(
-            self.date_time_in, self.fmt, "UTC").int_timestamp
+            self.date_time_in, self.fmt, "UTC"
+        ).int_timestamp
 
     def from_timestamp_to_human_readable(self):
         return pendulum.from_timestamp(self.date_time_in).to_datetime_string()
@@ -30,7 +33,7 @@ def seconds_in(time_frame: str) -> int:
     time_unit = time_frame[-1]
     time_amount = int(time_frame.split(time_unit)[0])
 
-    return time_amount*conversor_for[time_unit]
+    return time_amount * conversor_for[time_unit]
 
 
 class Serialize:
@@ -38,15 +41,16 @@ class Serialize:
         self.Target = Target
 
     def to_dict(self) -> dict:
-        return json.loads(json.dumps(
-            self.Target, default=lambda o: o.__dict__, indent=0))
+        return json.loads(
+            json.dumps(self.Target, default=lambda o: o.__dict__, indent=0)
+        )
 
     def to_json(self) -> str:
         return json.dumps(self.to_dict())
 
 
 class Deserialize:
-    def __init__(self, name='X'):
+    def __init__(self, name="X"):
         self.name = name
 
     def _json_object_hook(self, d):
@@ -60,8 +64,7 @@ class Deserialize:
 
 
 def timing(f):
-    """Time to process some function f
-    """
+    """Time to process some function f"""
 
     @wraps(f)
     def wrapper(*args, **kwargs):
@@ -69,13 +72,15 @@ def timing(f):
         _result = f(*args, **kwargs)
         print(
             "Time spent on {} method: {:6.4}s".format(
-                f.__name__, time() - _start))
+                f.__name__, time() - _start
+            )
+        )
         return _result
     return wrapper
 
 
 class DocInherit(object):
-    """ Docstring inheriting method descriptor
+    """Docstring inheriting method descriptor
     The class itself is also used as a decorator
     Reference: <http://code.activestate.com/recipes/576862/>
     """
@@ -128,22 +133,22 @@ class FormatKlines:
     ]
 
     def __init__(
-        self, time_frame,
+        self,
+        time_frame,
         klines: list,
         DateTimeFmt: str,
         DateTimeUnit: str,
-        columns: list
+        columns: list,
     ):
-
         self.time_frame = time_frame
         self.DateTimeFmt = DateTimeFmt
         self.DateTimeUnit = DateTimeUnit
         self.columns = columns
         self.formatted_klines = [self.format_each(kline) for kline in klines]
 
-    def format_datetime(self,
-                        datetime_in,
-                        truncate_seconds_to_zero=False) -> int:
+    def format_datetime(
+        self, datetime_in, truncate_seconds_to_zero=False
+    ) -> int:
 
         if self.DateTimeFmt == "timestamp":
             if self.DateTimeUnit == "seconds":
@@ -157,13 +162,11 @@ class FormatKlines:
 
                 if _date_time.second != 0:
                     datetime_out = (
-                        _date_time.subtract(
-                            seconds=_date_time.second)).int_timestamp
-
+                        _date_time.subtract(seconds=_date_time.second)
+                    ).int_timestamp
         return datetime_out
 
     def format_each(self, kline: list) -> list:
-
         return [
             self.format_datetime(_item, truncate_seconds_to_zero=True)
             if kline.index(_item) == self.columns.index("Open_time")
@@ -175,15 +178,14 @@ class FormatKlines:
 
     def to_dataframe(self) -> pd.DataFrame:
         klines = pd.DataFrame(
-            self.formatted_klines,
-            columns=self.columns
+            self.formatted_klines, columns=self.columns
         ).astype({"Open_time": "int32", "Close_time": "int32"})
 
-        klines.attrs.update(
-            {"SecondsTimeFrame": seconds_in(self.time_frame)})
+        klines.attrs.update({"SecondsTimeFrame": seconds_in(self.time_frame)})
         return klines
 
-def table_from_dict(my_dict:dict)->str:
+
+def table_from_dict(my_dict: dict) -> str:
     return tabulate([list(my_dict.values())], headers=list(my_dict.keys()))
 
 
