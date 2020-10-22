@@ -45,7 +45,8 @@ class ImplementedTraders:
 
 
 class ImplementedClassifiers:
-    CrossSMA = "CrossSMA"
+    DoubleCrossSMA = "DoubleCrossSMA"
+    TripleCrossSMA = "TripleCrossSMA"
 
 
 class ImplementedStopLosses:
@@ -89,7 +90,7 @@ class PossibleOrderTypes:
 
 class Default:
     trader = ImplementedTraders.SimpleKlinesTrader
-    classifier = ImplementedClassifiers.CrossSMA
+    classifier = ImplementedClassifiers.TripleCrossSMA
     stop_loss = ImplementedStopLosses.StopTrailing3T
     status = PossibleStatuses.NotRunning
     mode = PossibleModes.BackTesting
@@ -141,3 +142,7 @@ class BinanceSettings:
         "Taker_buy_quote_asset_volume",
         "Ignore",
     ]
+
+class TelegramSettings:
+    ids = None
+    token = None
