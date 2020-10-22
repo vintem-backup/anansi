@@ -31,12 +31,13 @@ def _safety_commit(retry=15):
         attempts += 1
         try:
             commit()
-            break
+            #break
+            return
         except:  #!TODO: To logging
             continue
-    if attempts >= retry:
-        rollback()
-    return
+    #if attempts >= retry:
+    rollback()
+    #return
 
 
 class AttributeUpdater(object):
@@ -153,6 +154,7 @@ class Operation(db.Entity, AttributeUpdater, OperationMixIn, Report):
     )
     status = Required(str, default=Default.status)
     last_check = Required(LastCheck)
+    last_open_time = Optional(int, default=0)
     operational_log = Set(lambda: OperationalLog, cascade_delete=True)
     trades_log = Set(lambda: TradeLog, cascade_delete=True)
 
@@ -257,7 +259,8 @@ class DefaultLog:
         self._backtesting_log_append()
 
     def _advisor_log_append(self):
-        self._backtesting_log_append()
+        pass
+        #self._backtesting_log_append()
 
     def report(self, event):
         event_key = "{}_{}".format(
