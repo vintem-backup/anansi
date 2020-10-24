@@ -90,7 +90,7 @@ class PossibleOrderTypes:
 
 class Default:
     trader = ImplementedTraders.SimpleKlinesTrader
-    classifier = ImplementedClassifiers.TripleCrossSMA
+    classifier = ImplementedClassifiers.DoubleCrossSMA
     stop_loss = ImplementedStopLosses.StopTrailing3T
     status = PossibleStatuses.NotRunning
     mode = PossibleModes.BackTesting
