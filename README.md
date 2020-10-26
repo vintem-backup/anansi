@@ -152,20 +152,20 @@ before_update, after_update
 
 ### Klines treated and ready for use, including market indicators methods
 
-The example below uses the 'KlinesFromBroker' class from the 'handlers'
+The example below uses the 'FromBroker' class from the 'klines'
 module ('marketdata' package), which works as an abstraction over the
-data brokers, not only serializing requests (in order to respect
-brokers' limits), but also conforming the klines like a pandas
+'brokers' layer, not only queueing requests (in order to respect
+brokers limits), but also conforming the klines like a pandas
 dataframe,
 [extended](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.api.extensions.register_dataframe_accessor.html)
 with market indicator methods.
 
 ```python
-from anansi_toolkit.marketdata.handlers import KlinesFromBroker
+from anansi_toolkit.marketdata import klines
 ```
 
 ```python
-BinanceKlines = KlinesFromBroker(
+BinanceKlines = klines.FromBroker(
   broker_name="binance", ticker_symbol="BTCUSDT", time_frame="1h")
 ```
 
@@ -622,22 +622,22 @@ newest_klines
 <p>2167 rows × 7 columns</p>
 </div>
 
-### Raw klines, using the low level abstraction module "*data_brokers*"
+### Raw klines, using the low level abstraction module "*brokers*"
 
 **DISCLAIMER: Requests here are not queued! There is a risk of banning
 the IP or even blocking API keys if some limits are exceeded. Use with
 caution.**
 
 ```python
-from anansi_toolkit.marketdata import data_brokers
+from anansi_toolkit.share import brokers
 ```
 
 ```python
-BinanceBroker = data_brokers.BinanceDataBroker()
+binance_broker = brokers.Binance()
 ```
 
 ```python
-my_klines = BinanceBroker.get_klines(ticker_symbol="BTCUSDT", time_frame="1m")
+my_klines = binance_broker.get_klines(ticker_symbol="BTCUSDT", time_frame="1m")
 ```
 
 ```python
@@ -775,10 +775,10 @@ my_klines
 <p>499 rows × 6 columns</p>
 </div>
 
-### Same as above, but returning all information get from the data broker
+### Same as above, but returning all information got from broker
 
 ```python
-my_klines = BinanceBroker.get_klines(ticker_symbol="BTCUSDT", time_frame="1m", show_only_desired_info=False)
+my_klines = binance_broker.get_klines(ticker_symbol="BTCUSDT", time_frame="1m", show_only_desired_info=False)
 ```
 
 ```python
