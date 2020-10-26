@@ -11,7 +11,7 @@ from .models import (
     Classifier,
     StopLoss,
 )
-from ..settings import Default
+from ..settings import Default, PossibleModes as MODE
 from ..share.tools import Serialize
 
 
@@ -33,7 +33,7 @@ def create_user(**kwargs):
 
 
 @db_session
-def create_default_operation(user):
+def create_default_back_testing_operation(user):
     Operation(
         user=user,
         market=Market(),
@@ -45,4 +45,20 @@ def create_default_operation(user):
         stop_loss=StopLoss(
             name=Default.stop_loss, parameters=DefaultStopLossParameters()
         ),
+    )
+
+@db_session
+def create_default_advisor_operation(user):
+    Operation(
+        user=user,
+        market=Market(),
+        position=Position(assets=Assets()),
+        last_check=LastCheck(by_classifier_at=0),
+        classifier=Classifier(
+            name=Default.classifier, parameters=DefaultClassifierParameters()
+        ),
+        stop_loss=StopLoss(
+            name=Default.stop_loss, parameters=DefaultStopLossParameters()
+        ),
+        mode = MODE.Advisor
     )

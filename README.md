@@ -23,6 +23,7 @@ Just type:
     pip install anansi-toolkit
 
 or clone it from this repo and install it's dependencies by doing:
+
     git clone gitlab.com/marcusmello/anansi
     poetry install
 
@@ -36,7 +37,8 @@ dependencies):
 
     poetry run python -m ipykernel install --user --name=$(basename $(pwd))
 
-... or:
+... or:  
+
     poetry run python -m ipykernel install --user --name=(basename (pwd))
 
 if you are a [fish](https://fishshell.com/ "command line shell interpreter")
@@ -54,7 +56,8 @@ or, if you want to release the prompt, do:
 
 You must have to do this on a isolated environment, with dependencies embedded, doing:
 
-  poetry shell
+    poetry shell
+    python
 
 ## Straight to the point: Running Default Back Testing Operation
 
@@ -63,7 +66,7 @@ You must have to do this on a isolated environment, with dependencies embedded, 
 ```python
 from anansi_toolkit.tradingbot.models import *
 from anansi_toolkit.tradingbot import traders
-from anansi_toolkit.tradingbot.views import create_user, create_default_operation
+from anansi_toolkit.tradingbot.views import create_user, create_default_back_testing_operation
 ```
 
 ### Add a new user
@@ -76,11 +79,11 @@ create_user(first_name=my_user_first_name,
                    email = "{}@email.com".format(my_user_first_name.lower()))
 ```
 
-### Creating a default operation
+### Creating a default back testing operation
 
 ```python
 my_user = User[1]
-create_default_operation(user=my_user)
+create_default_back_testing_operation(user=my_user)
 ```
 
 ### Instantiating a trader

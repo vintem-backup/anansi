@@ -2,7 +2,8 @@ import time
 import pendulum
 import math
 from ..marketdata import handlers
-from ..share.tools import EventContainer
+from ..share.tools import EventContainer, ParseDateTime, Serialize
+from ..share.reporters import TelegramReport
 from . import classifiers, orders
 from .models import DefaultLog
 
@@ -13,28 +14,26 @@ from ..settings import (
     PossibleStatuses as STAT,
 )
 
+
 class SimpleKlinesTrader:
     def __init__(self, operation):
         self._event = EventContainer(reporter=self.__class__.__name__)
-        self.ticker_symbol = (
-            operation.market.quote_symbol + operation.market.base_symbol
-        )
         self.log = DefaultLog(operation)
         self.OrderHandler = orders.Handler(operation, self.log)
         self.Classifier = getattr(classifiers, operation.classifier.name)(
             parameters=operation.classifier.parameters, log=self.log
         )
-        self.operation = operation
+        self.op = operation
         self.last_result = None
-        self._step:int = None
-        self._price_now:float = None
+        self._step: int = None
+        self._price_now: float = None
         self._instantiate_klines_and_price_getters()
 
     def _instantiate_klines_and_price_getters(self):
-        backtesting = bool(self.operation.mode == MODE.BackTesting)
+        backtesting = bool(self.op.mode == MODE.BackTesting)
         kwargs = dict(
-            broker_name=self.operation.market.exchange,
-            ticker_symbol=self.ticker_symbol,
+            broker_name=self.op.market.exchange,
+            ticker_symbol=self.op.market.ticker_symbol,
         )
         tf = dict(time_frame=self.Classifier.parameters.time_frame)
         self.KlinesGetter = (
@@ -57,38 +56,47 @@ class SimpleKlinesTrader:
     def _get_final_backtesting_now(self):
         return self.KlinesGetter._newest_open_time()
 
-    def _start(self):  
-        self.operation.if_no_assets_fill_them() 
-        self._now = pendulum.now().int_timestamp
-        self.operation.update(status=STAT.Running)
+    def _start(self):
+        self.op.if_no_assets_fill_them()
+        self._now = pendulum.now("UTC").int_timestamp
+        self.op.update(status=STAT.Running)
 
-        if self.operation.mode == MODE.BackTesting:
-            self.operation.reset()
-            
-            #TODO: Refactoring suggestion: The initial and final 
+        if self.op.mode == MODE.BackTesting:
+            self.op.reset()
+
+            # TODO: Refactoring suggestion: The initial and final
             # values ​​of '_now' must be attributes of the operation
             self._now = self._get_initial_backtesting_now()
             self._final_backtesting_now = self._get_final_backtesting_now()
 
     def _get_ready_to_repeat(self):
         self._consolidate_log()
-        if self.operation.mode == MODE.BackTesting:
-            self.operation.print_report()
+
+        if self.op.mode == MODE.BackTesting:
+            self.op.print_report()
             self._now += self._step
 
             if self._now > self._final_backtesting_now:
-                self.operation.update(status=STAT.NotRunning)
+                self.op.update(status=STAT.NotRunning)
 
         else:
-            sleep_time = (
-                self._step
-                - pendulum.from_timestamp(self._now).second
-            )
-            time.sleep(sleep_time)
-            self._now = pendulum.now().int_timestamp + 3
+            if self.op.position.side != SIDE.Zeroed:
+                time.sleep(self._step)
 
-    def _end(self):  #TODO: Make a final report
-        self._report_to_log("It's the end!") #TODO: Not appending, cause is after "repeat"
+            else:
+                next_close_time = self.op.last_open_time + (2 * self._step)
+                _time = (
+                    next_close_time - pendulum.now("UTC").int_timestamp
+                ) + 3
+                print("sleeping {} sec.".format(_time))
+                time.sleep(_time)
+
+            self._now = pendulum.now("UTC").int_timestamp
+
+    def _end(self):  # TODO: Make a final report
+        self._report_to_log(
+            "It's the end!"
+        )  # TODO: Not appending, cause is after "repeat"
 
     def _get_price(self):
         price = self.PriceGetter.get(at=self._now)
@@ -99,11 +107,15 @@ class SimpleKlinesTrader:
         return
 
     def _do_analysis(self):
-        self._get_price()
-        self._step = self.Classifier.step
-        is_positioned = bool(self.operation.position.side != SIDE.Zeroed)
+        # TODO: After non back testing price implementation,
+        # this will be useless.
+        if self.op.mode != MODE.Advisor:
+            self._get_price()
 
-        if is_positioned and self.operation.is_stop_loss_enabled:
+        self._step = self.Classifier.step
+        is_positioned = bool(self.op.position.side != SIDE.Zeroed)
+
+        if is_positioned and self.op.is_stop_loss_enabled:
             pass
             # self._step = self.StopLoss.step
             # self._stop_analysis()
@@ -112,11 +124,7 @@ class SimpleKlinesTrader:
 
     def _classifier_analysis(self):
         is_there_a_new_candle = bool(
-            self._now
-            >= (
-                self.operation.last_check.by_classifier_at
-                + self.Classifier.step
-            )
+            self._now >= (self.op.last_open_time + self.Classifier.step)
         )
         if is_there_a_new_candle:
             kwargs = dict(
@@ -125,26 +133,42 @@ class SimpleKlinesTrader:
             )
             data = self.KlinesGetter.get(**kwargs)
             self.last_result = self.Classifier.get_result_for_this(data)
-            self.operation.last_check.update(by_classifier_at=self._now)
-    
+            self.op.last_check.update(by_classifier_at=self._now)
+            most_recent_open_time = data.Open_time.tail(1).item()
+            print("Most recent open time: {}".format(most_recent_open_time))
+
+            self.op.update(
+                last_open_time=ParseDateTime(
+                    most_recent_open_time
+                ).from_human_readable_to_timestamp()
+            )
+
     def _stop_analysis(self):
         pass
 
     def _execute_the_order_if_the_side_changes(self):
-        current_side = self.operation.position.side
+        current_side = self.op.position.side
         suggested_side = self.last_result.side
-        
+
+        if self.op.mode == MODE.Advisor:
+            self._spread_advice()
+            return
+
         if current_side != suggested_side:
             order = dict(
                 timestamp=self._now,
                 from_side=current_side,
-                to_side=suggested_side, 
-                price = self._price_now,
-                due_to_stop = self.last_result.due_to_stop,
+                to_side=suggested_side,
+                price=self._price_now,
+                due_to_stop=self.last_result.due_to_stop,
             )
             self.OrderHandler.execute(order)
 
-    def _report_to_log(self, event_description:str):
+    def _spread_advice(self):
+        msg = Serialize(self.last_result).to_json()
+        TelegramReport().send(msg)
+
+    def _report_to_log(self, event_description: str):
         self._event.description = event_description
         self.log.report(self._event)
 
@@ -152,15 +176,15 @@ class SimpleKlinesTrader:
         self.log.price = self._price_now
         self.log.update(timestamp=self._now)
         return
-    
+
     def run(self):
         self._start()
-        while self.operation.status == STAT.Running:
+        while self.op.status == STAT.Running:
             try:
                 self._do_analysis()
                 self._execute_the_order_if_the_side_changes()
             except (Exception, ConnectionError) as e:
                 self._report_to_log(str(e))
-            
+
             self._get_ready_to_repeat()
         self._end()
