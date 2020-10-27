@@ -158,6 +158,9 @@ class Handler:
             self._new_base_amount = self._base + bought_base_amount
             self._proceed_updates()
 
+    def _advisor_executor(self):
+        pass
+
     def execute(self, _order: dict):
         self.order = Order(**_order)
         self.SigGen.process(
