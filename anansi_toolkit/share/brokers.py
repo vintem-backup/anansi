@@ -84,7 +84,7 @@ class Broker:
 
         raise NotImplementedError
 
-    def _get_mininal_amount_for(self, ticker_symbol: str) -> float:
+    def minimal_amount_for(self, ticker_symbol: str) -> float:
         """Given a ticker_symbol, returns the smallest amount that could be
         trade.
 
@@ -159,5 +159,5 @@ class Binance(Broker, BinanceSettings):
         return klines
 
     @doc_inherit
-    def _get_mininal_amount_for(self, ticker_symbol: str) -> float:
+    def minimal_amount_for(self, ticker_symbol: str) -> float:
         return 0.000001  # TODO: Implement this
