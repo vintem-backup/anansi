@@ -1,4 +1,6 @@
-class PriceGetter:
+from .klines import BackTesting
+
+class Price:
     def __init__(self, broker_name: str, ticker_symbol: str):
         self.broker_name = broker_name
         self.ticker_symbol = ticker_symbol
@@ -7,11 +9,9 @@ class PriceGetter:
         raise NotImplementedError
 
 
-class BackTestingPriceGetter:
+class BackTestingPrice:
     def __init__(self, broker_name: str, ticker_symbol: str):
-        self.klines = BackTestingKlines(
-            broker_name, ticker_symbol, time_frame="1m"
-        )
+        self.klines = BackTesting(broker_name, ticker_symbol)
 
     def get(self, at: int) -> float:
         """It's possible that the broker - due to a server side issue,
