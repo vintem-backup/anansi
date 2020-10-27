@@ -1,6 +1,6 @@
 from pony.orm import db_session
 import json
-from . import classifiers, stop_handlers
+from . import classifiers, stoploss
 from .models import (
     User,
     Operation,
@@ -24,7 +24,7 @@ def DefaultClassifierParameters():
 
 
 def DefaultStopLossParameters():
-    return default_parameters_for(getattr(stop_handlers, Default.stop_loss))
+    return default_parameters_for(getattr(stoploss, Default.stop_loss))
 
 
 @db_session
