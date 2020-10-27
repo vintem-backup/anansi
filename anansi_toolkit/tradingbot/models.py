@@ -108,13 +108,11 @@ class LastCheck(db.Entity, AttributeUpdater):
 class OperationMixIn:
     def _reset_assets(self):
         self.position.assets.update(quote=0.0, base=self.initial_base_amount)
-        return
 
     def clear_logs(self):
         self.operational_log.clear()
         self.trades_log.clear()
         _safety_commit()
-        return
 
     def if_no_assets_fill_them(self):
         no_assets = bool(
@@ -123,19 +121,18 @@ class OperationMixIn:
         )
         if no_assets:
             self._reset_assets()
-        return
 
     def reset(self):
+        self.update(last_open_time=0)
         self.last_check.update(by_classifier_at=0)
         self.position.update(side=SIDE.Zeroed)
         self._reset_assets()
         self.clear_logs()
-        return
 
     def new_trade_log(self, trade_details: dict):
         self.trades_log.create(**trade_details)
         _safety_commit()
-        return
+
 
 
 class Operation(db.Entity, AttributeUpdater, OperationMixIn, Report):
