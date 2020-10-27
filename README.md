@@ -104,13 +104,14 @@ my_trader.run()
 ### Getting all users
 
 ```python
+from pony.orm import select
 users = select(user for user in User)
 users.show()
 ```
 
-    id|first_name|last_name|login_displayed_name|email         
-    --+----------+---------+--------------------+--------------
-    1 |John      |Doe      |                    |john@email.com
+    id|first_name|last_name|email         
+    --+----------+---------+--------------
+    1 |John      |Doe      |john@email.com
 
 ```python
 my_user.first_name
