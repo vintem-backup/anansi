@@ -1,12 +1,16 @@
+import sys
 import pandas as pd
-import requests
 import pendulum
-from .. import settings
-from ..share.tools import DocInherit, FormatKlines
+import requests
+from .tools import DocInherit, FormatKlines
+from ..settings import BinanceSettings, kline_desired_informations
 
+thismodule = sys.modules[__name__]
 doc_inherit = DocInherit
 
-#!TODO: Translate docstrings and delete useless commented blocks
+
+def instantiate_broker(broker_name):
+    return getattr(thismodule, broker_name.capitalize())()
 
 
 def get_response(endpoint: str) -> requests.models.Response:
@@ -15,7 +19,7 @@ def get_response(endpoint: str) -> requests.models.Response:
             if response.status_code == 200:
                 return response
     except Exception as e:
-        raise ConnectionError( #TODO: To logging
+        raise ConnectionError(
             "Could not establish a broker connection. Details: {}".format(e)
         )
 
@@ -30,23 +34,19 @@ def remove_last_if_unclosed(klines):
     return klines
 
 
-class DataBroker:
+class Broker:
     def server_time(self) -> int:
-        """Data e horário do servidor da corretora
+        """Date time of broker server.
 
-        Returns:
-            int: Timestamp em segundos
+        Returns (int): Seconds timestamp
         """
         raise NotImplementedError
 
     def was_request_limit_reached(self) -> bool:
-        """Teste booleano para verificar se o limite de requests, no
-        minuto corrente e um IP, foi atingido; utilizando a informação
-        'x-mbx-used-weight-1m' (ou similar) do header do response da
-        corretora, retorna o número de requests feitos no minuto
-        corrente.
+        """Boolean test to verify if the request limit, in the current
+        minute (for a given IP), has been reached.
 
-        Returns: bool: Limite atingido?
+        Returns (bool): Hit the limit?
         """
         raise NotImplementedError
 
@@ -58,40 +58,50 @@ class DataBroker:
         show_only_desired_info: bool = True,
         **kwargs
     ) -> pd.DataFrame:
-        """Histórico (OHLCV) de mercado.
+        """Historical market data (candlesticks, OHLCV).
 
         Args:
-            symbol (str): Símbolo do ativo
-            time_frame (str): Intervalo (escala) dos candlesticks
+            ticker_symbol (str): 'BTCUSDT', for example.
+            time_frame (str): '1m', '2h', '1d'...
             ignore_opened_candle (bool, optional): Defaults to True
             show_only_desired_info (bool, optional): Defaults to True.
 
         **kwargs:
-            number_of_candles (int): Número de candelesticks
-            desejados por série; observar limite de cada corretora
-            ao implementar o método.
+            number_of_candles (int): Number or desired candelesticks
+            for request; must to respect the broker limits.
 
-            É possível passar os timestamps, medidos em segundos:
-            since (int): Open_time do primeiro candlestick da série
-            until (int): Open_time do último candlestick da série
+            It's possible to pass timestamps (seconds):
+            since (int): Open_time of the first candlestick on desired series
+            until (int): Open_time of the last candlestick on desired series
+
+        Returns (pd.DataFrame): N lines DataFrame, where 'N' is the number of
+        candlesticks returned by broker, which must be less than or equal to
+        the '_LIMIT_PER_REQUEST' parameter, defined in the broker's settings
+        (settings module). The dataframe columns represents the information
+        provided by the broker, declared by the parameter 'kline_information'
+        (settings, on the broker settings class).
+        """
+
+        raise NotImplementedError
+
+    def minimal_amount_for(self, ticker_symbol: str) -> float:
+        """Given a ticker_symbol, returns the smallest amount that could be
+        trade.
+
+        Args:
+            ticker_symbol (str): 'BTCUSDT', for example.
 
         Returns:
-            pd.DataFrame: Dataframe de N linhas em que N é o número
-            de amostras (klines) retornadas no response, podendo ser
-            menor ou igual ao parâmetro _LIMIT_PER_REQUEST, definido
-            nas configurações da corretora (arquivo settings.py).
-            As colunas do dataframe representam as informações
-            tabuladas pela corretora, declaradas no parâmetro
-            kline_information_map, também nas configurações.
+            float: minimal amount
         """
 
         raise NotImplementedError
 
 
-class BinanceDataBroker(DataBroker, settings.BinanceSettings):
+class Binance(Broker, BinanceSettings):
     @doc_inherit
     def __init__(self):
-        super(BinanceDataBroker, self).__init__()
+        super(Binance, self).__init__()
 
     @doc_inherit
     def server_time(self) -> int:
@@ -138,12 +148,16 @@ class BinanceDataBroker(DataBroker, settings.BinanceSettings):
             raw_klines,
             DateTimeFmt=self.DateTimeFmt,
             DateTimeUnit=self.DateTimeUnit,
-            columns=self.kline_informations,
+            columns=self.kline_information,
         ).to_dataframe()
 
         if ignore_opened_candle:
             klines = remove_last_if_unclosed(klines)
 
         if show_only_desired_info:
-            return klines[settings.kline_desired_informations]
+            return klines[kline_desired_informations]
         return klines
+
+    @doc_inherit
+    def minimal_amount_for(self, ticker_symbol: str) -> float:
+        return 0.000001  # TODO: Implement this

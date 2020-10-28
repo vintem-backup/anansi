@@ -5,7 +5,8 @@ from ..settings import (
     PossibleModes as MODE,
 )
 from ..share.tools import EventContainer, Serialize, table_from_dict
-from .trade_brokers import trade_broker
+from ..share.brokers import instantiate_broker
+
 
 class Order:
     def __init__(
@@ -77,13 +78,13 @@ class SignalGenerator:
 class Handler:
     def __init__(self, operation, log):
         self.SigGen = SignalGenerator(operation.allowed_special_signals)
-        self.operation = operation
+        self.op = operation
         self.log = log
         self._event = EventContainer(reporter=self.__class__.__name__)
-        ticker_symbol = (
-            operation.market.quote_symbol + operation.market.base_symbol
+        self.broker = instantiate_broker(operation.market.exchange)
+        self.minimal_amount = self.broker.minimal_amount_for(
+            self.op.market.ticker_symbol
         )
-        self.broker = trade_broker(operation.market.exchange, ticker_symbol)
         self._order_execute = getattr(
             self, "_{}_executor".format((operation.mode).lower())
         )
@@ -96,8 +97,8 @@ class Handler:
         self.log.report(self._event)
 
     def _get_avaliable(self):
-        self._base = self.operation.position.assets.base
-        self._quote = self.operation.position.assets.quote
+        self._base = self.op.position.assets.base
+        self._quote = self.op.position.assets.quote
 
     def _calculate_amount(self):
         signal = self.SigGen.signal
@@ -110,14 +111,14 @@ class Handler:
         elif signal in [SIG.Sell, SIG.StopFromLong]:  # , SIG.DoubleSell]:
             raw_amount = self._quote
 
-        factor = int(raw_amount / self.broker.mininal_amount)
-        self.order.amount = factor * self.broker.mininal_amount
+        factor = int(raw_amount / self.minimal_amount)
+        self.order.amount = factor * self.minimal_amount
 
     def _proceed_updates(self):
-        self.operation.position.assets.update(
+        self.op.position.assets.update(
             quote=self._new_quote_amount, base=self._new_base_amount
         )
-        self.operation.position.update(
+        self.op.position.update(
             side=self.SigGen.side,
             traded_price=self.order.price,
             traded_at=self.order.timestamp,
@@ -130,13 +131,11 @@ class Handler:
             quote_amount=self.order.amount,
             fee=self.fee_base,
         )
-        self.operation.new_trade_log(self._trade_details)
-        return
+        self.op.new_trade_log(self._trade_details)
 
     def _notify_trade(self):
-        if self.operation.mode == MODE.BackTesting:
+        if self.op.mode == MODE.BackTesting:
             print(table_from_dict(self._trade_details))
-        return
 
     def _backtesting_executor(self):
         signal = self.order.signal
@@ -159,8 +158,6 @@ class Handler:
             self._new_base_amount = self._base + bought_base_amount
             self._proceed_updates()
 
-        return
-
     def _advisor_executor(self):
         pass
 
@@ -170,13 +167,13 @@ class Handler:
             self.order.from_side, self.order.to_side, self.order.due_to_stop
         )
         self.order.signal = self.SigGen.signal
-        if self.operation.mode == MODE.Advisor:
+        if self.op.mode == MODE.Advisor:
             self._order_execute()
 
         else:
             if self.SigGen.signal not in [SIG.Hold, SIG.SkippedDueToStopLoss]:
                 self._calculate_amount()
-                funds = bool(self.order.amount > self.broker.mininal_amount)
+                funds = bool(self.order.amount > self.minimal_amount)
 
                 if funds:
                     self._order_execute()
@@ -188,4 +185,3 @@ class Handler:
         # working correctly.
         self.log.order = Serialize(self.order).to_dict()
         self._notify_trade()
-        return

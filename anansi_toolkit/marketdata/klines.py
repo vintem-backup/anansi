@@ -1,9 +1,10 @@
 import time
 import pandas as pd
 import pendulum
-from . import indicators, data_brokers as brokers
+from . import indicators
+from .models import StorageRawKlines
+from ..share.brokers import instantiate_broker
 from ..share.tools import ParseDateTime, seconds_in
-from ..share.db_handlers import StorageKlines
 
 pd.options.mode.chained_assignment = None
 
@@ -56,8 +57,8 @@ class ApplyIndicator:
         self.volume = indicators.Volume(self._klines)
 
 
-class KlinesFromBroker:
-    """ Aims to serve as a queue for requesting klines (OHLC) through brokers
+class FromBroker:
+    """Aims to serve as a queue for requesting klines (OHLC) through brokers
     endpoints, spliting the requests, in order to respect broker established
     limits.
     If a request limit is close to being reached, will pause the queue,
@@ -74,20 +75,25 @@ class KlinesFromBroker:
         "_until",
     ]
 
-    def __init__(self,
-                 broker_name: str,
-                 ticker_symbol: str,
-                 time_frame: str = None):
-
+    def __init__(
+        self, broker_name: str, ticker_symbol: str, time_frame: str = ""
+    ):
         self.broker_name = broker_name.lower()
         self.ticker_symbol = ticker_symbol.upper()
-        self._broker = getattr(
-            brokers, "{}DataBroker".format(broker_name.capitalize()))()
-
-        self._time_frame = (time_frame if time_frame
-                            else "1m")  # self._broker.minimal_time_frame)
+        self._broker = instantiate_broker(broker_name)
+        self._validate_tf(time_frame)
         self._since = 1
         self._until = 2
+
+    def _validate_tf(self, tf: str):
+        tf_list = self._broker.possible_time_frames
+        if tf:
+            if tf in tf_list:
+                self._time_frame = tf
+            else:
+                raise ValueError("Time frame must be in {}".format(tf_list))
+        else:
+            self._time_frame = tf_list[0]
 
     @property
     def time_frame(self):
@@ -95,7 +101,8 @@ class KlinesFromBroker:
 
     @time_frame.setter
     def time_frame(self, time_frame_to_set):
-        self._time_frame = time_frame_to_set
+        self._validate_tf(time_frame_to_set)
+        # self._time_frame = time_frame_to_set
 
     def _now(self) -> int:
         return (pendulum.now(tz="UTC")).int_timestamp
@@ -104,12 +111,12 @@ class KlinesFromBroker:
         return seconds_in(self._time_frame)
 
     def _oldest_open_time(self) -> int:
-        return (
-            self._broker.get_klines(
-                ticker_symbol=self.ticker_symbol,
-                time_frame=self._time_frame,
-                since=1,
-                number_of_candles=1).Open_time.item())
+        return self._broker.get_klines(
+            ticker_symbol=self.ticker_symbol,
+            time_frame=self._time_frame,
+            since=1,
+            number_of_candles=1,
+        ).Open_time.item()
 
     def _newest_open_time(self):
         return self._now()
@@ -118,20 +125,21 @@ class KlinesFromBroker:
         return self._broker.records_per_request * self.SecondsTimeFrame()
 
     def _get_raw_(self, appending_raw_to_db=False) -> pd.DataFrame:
-
         table_name = "{}_{}_{}_raw".format(
-            self.broker_name, self.ticker_symbol.lower(), self._time_frame)
+            self.broker_name, self.ticker_symbol.lower(), self._time_frame
+        )
+        Storage, klines = StorageRawKlines(table_name), pd.DataFrame()
 
-        Storage, klines = StorageKlines(table_name), pd.DataFrame()
-
-        for timestamp in range(self._since,
-                               self._until + 1,  # 1 sec after '_until'
-                               self._request_step()):
+        for timestamp in range(
+            self._since,
+            self._until + 1,  # 1 sec after '_until'
+            self._request_step(),
+        ):
             while True:
                 try:
                     raw_klines = self._broker.get_klines(
-                        self.ticker_symbol, self._time_frame, since=timestamp)
-
+                        self.ticker_symbol, self._time_frame, since=timestamp
+                    )
                     if appending_raw_to_db:
                         Storage.append_dataframe(raw_klines)
                     klines = klines.append(raw_klines, ignore_index=True)
@@ -152,12 +160,15 @@ class KlinesFromBroker:
     # TODO: Sanitize since/until to avoid ValueError until < since
     def _until_given_since_n(self, since, number_of_candles):
         until = (number_of_candles + 1) * self.SecondsTimeFrame() + since
-        self._until = (until if until <= self._now() else self._now())
+        self._until = until if until <= self._now() else self._now()
 
     def _since_given_until_n(self, until, number_of_candles):
         since = until - (number_of_candles + 1) * self.SecondsTimeFrame()
-        self._since = (since if since >= self._oldest_open_time()
-                       else self._oldest_open_time())
+        self._since = (
+            since
+            if since >= self._oldest_open_time()
+            else self._oldest_open_time()
+        )
 
     def _get_n_until(self, number_of_candles: int, until: int):
         self._until = until
@@ -171,7 +182,9 @@ class KlinesFromBroker:
         _klines = self._get_raw_()
         return _klines[_klines.Open_time >= self._since][:number_of_candles]
 
-    def _get_given_since_and_until(self, since: int, until: int) -> pd.DataFrame:
+    def _get_given_since_and_until(
+        self, since: int, until: int
+    ) -> pd.DataFrame:
         self._since, self._until = since, until
         _klines = self._get_raw_()
         return _klines[_klines.Open_time <= self._until]
@@ -187,9 +200,9 @@ class KlinesFromBroker:
             return int(datetime)  # Already int or str timestamp
         except:  # Human readable datetime ("YYYY-MM-DD HH:mm:ss")
             try:
-                return (
-                    ParseDateTime(
-                        datetime).from_human_readable_to_timestamp())
+                return ParseDateTime(
+                    datetime
+                ).from_human_readable_to_timestamp()
             except:
                 return 0  # indicative of error
 
@@ -210,60 +223,23 @@ class KlinesFromBroker:
             if number_of_candles and since and not until
             else self._get_n_until(number_of_candles, until)
             if number_of_candles and until and not since
-            else pd.DataFrame())  # Errors imply an empty dataframe
+            else pd.DataFrame()
+        )  # Errors imply an empty dataframe
 
         klines.KlinesDateTime.from_timestamp_to_human_readable()
         return klines
 
     def oldest(self, number_of_candles=1) -> pd.DataFrame:
-        return self.get(number_of_candles=number_of_candles,
-                        since=self._oldest_open_time())
+        return self.get(
+            number_of_candles=number_of_candles, since=self._oldest_open_time()
+        )
 
     def newest(self, number_of_candles=1) -> pd.DataFrame:
-        return self.get(number_of_candles=number_of_candles,
-                        until=self._now())
+        return self.get(number_of_candles=number_of_candles, until=self._now())
 
 
-class BackTestingKlines(KlinesFromBroker):  # just mocking for while
-    def __init__(self,
-                 broker_name: str,
-                 ticker_symbol: str,
-                 time_frame=None):
-
-        super(BackTestingKlines, self).__init__(
-            broker_name, ticker_symbol, time_frame)
-
-
-class PriceGetter:
-    def __init__(self, broker_name: str, ticker_symbol: str):
-        self.broker_name = broker_name
-        self.ticker_symbol = ticker_symbol
-
-    def get(self, **kwargs):
-        raise NotImplementedError
-
-
-class BackTestingPriceGetter:
-    def __init__(self, broker_name: str, ticker_symbol: str):
-        self.klines = BackTestingKlines(broker_name,
-                                        ticker_symbol,
-                                        time_frame="1m")
-
-    def get(self, at: int) -> float:
-        """ It's possible that the broker - due to a server side issue, 
-        does not have data for the requested period, making the returned
-        klines an empty dataframe. It is possible to reproduce the error
-        by comment/uncomment out the 'klines' variable below. The lower
-        the 'number_of_candles', the greater the possibility of an
-        error. This issue will be checked in the next refactoring, when
-        the klines and prices for back testing will be get from an owned
-        database, after an interpolation process to complete the missing
-        data.
-        """
-
-        klines = self.klines.get(number_of_candles=100, until=at+3000)
-        #klines = self.klines.get(number_of_candles=10, until=at+300)
-        price = klines.apply_indicator.trend.simple_moving_average(
-            number_of_candles=5,
-            metrics="ohlc4")
-        return float(price._series.mean())
+class BackTesting(FromBroker):  # just mocking for while
+    def __init__(self, broker_name: str, ticker_symbol: str, time_frame=""):
+        super(BackTesting, self).__init__(
+            broker_name, ticker_symbol, time_frame
+        )

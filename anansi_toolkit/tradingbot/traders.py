@@ -1,7 +1,7 @@
 import time
 import pendulum
 import math
-from ..marketdata import handlers
+from ..marketdata import klines, price
 from ..share.tools import EventContainer, ParseDateTime, Serialize
 from ..share.reporters import TelegramReport
 from . import classifiers, orders
@@ -37,14 +37,14 @@ class SimpleKlinesTrader:
         )
         tf = dict(time_frame=self.Classifier.parameters.time_frame)
         self.KlinesGetter = (
-            handlers.BackTestingKlines(**kwargs, **tf)
+            klines.BackTesting(**kwargs, **tf)
             if backtesting
-            else handlers.KlinesFromBroker(**kwargs, **tf)
+            else klines.FromBroker(**kwargs, **tf)
         )
         self.PriceGetter = (
-            handlers.BackTestingPriceGetter(**kwargs)
+            price.BackTestingPrice(**kwargs)
             if backtesting
-            else handlers.PriceGetter(**kwargs)
+            else price.Price(**kwargs)
         )
 
     def _get_initial_backtesting_now(self):
@@ -88,7 +88,6 @@ class SimpleKlinesTrader:
                 _time = (
                     next_close_time - pendulum.now("UTC").int_timestamp
                 ) + 3
-                print("sleeping {} sec.".format(_time))
                 time.sleep(_time)
 
             self._now = pendulum.now("UTC").int_timestamp
@@ -96,7 +95,8 @@ class SimpleKlinesTrader:
     def _end(self):  # TODO: Make a final report
         self._report_to_log(
             "It's the end!"
-        )  # TODO: Not appending, cause is after "repeat"
+        )
+        self._consolidate_log()
 
     def _get_price(self):
         price = self.PriceGetter.get(at=self._now)
@@ -104,7 +104,6 @@ class SimpleKlinesTrader:
             raise ValueError("Fail to get price")
         else:
             self._price_now = price
-        return
 
     def _do_analysis(self):
         # TODO: After non back testing price implementation,
@@ -133,16 +132,15 @@ class SimpleKlinesTrader:
             )
             data = self.KlinesGetter.get(**kwargs)
             self.last_result = self.Classifier.get_result_for_this(data)
-            self.op.last_check.update(by_classifier_at=self._now)
+            
             most_recent_open_time = data.Open_time.tail(1).item()
-            print("Most recent open time: {}".format(most_recent_open_time))
-
             self.op.update(
                 last_open_time=ParseDateTime(
                     most_recent_open_time
                 ).from_human_readable_to_timestamp()
             )
-
+            self.op.last_check.update(by_classifier_at=self._now)
+    
     def _stop_analysis(self):
         pass
 
@@ -175,7 +173,6 @@ class SimpleKlinesTrader:
     def _consolidate_log(self):
         self.log.price = self._price_now
         self.log.update(timestamp=self._now)
-        return
 
     def run(self):
         self._start()
