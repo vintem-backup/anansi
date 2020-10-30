@@ -1,6 +1,6 @@
 # pylint: skip-file
 import json
-from anansi_toolkit.share.tools import ParseDateTime
+from ..share.tools import ParseDateTime
 from pony.orm import select, desc
 from ..share.tools import table_from_dict
 
